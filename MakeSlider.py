@@ -7,23 +7,24 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN, MSO_AUTO_SIZE
 
 # --- Constantes de Configuração ---
-# (Mantendo valores da v17/v18, mas ajustando nomes para clareza)
 LARGURA_SLIDE = Inches(16)
 ALTURA_SLIDE = Inches(9)
-MARGEM_TEXTO = Inches(0.1)
+MARGEM_TEXTO = Inches(0.05)
 DEFAULT_TAMANHO_FONTE_MUSICA_REFRAO = Pt(80)
 DEFAULT_TAMANHO_FONTE_MUSICA_VERSO = Pt(80)
-DEFAULT_TAMANHO_FONTE_ACLAMACAO = Pt(54)
-DEFAULT_TAMANHO_FONTE_ANTIFONA = Pt(48)
-# Tamanhos para Leitura/Salmo
-DEFAULT_TAMANHO_FONTE_LEITURA_TITULO_AMARELO = Pt(80) # Tamanho para a Ref/Título (Amarelo)
-DEFAULT_TAMANHO_FONTE_LEITURA_TEXTO_BRANCO = Pt(54)  # Tamanho para Texto Principal (Branco)
-TAMANHO_TITULO_PARTE = Pt(60) # Para títulos de seção NÃO editáveis (PALAVRA, CREDO, etc.)
+DEFAULT_TAMANHO_FONTE_ACLAMACAO = Pt(70)
+DEFAULT_TAMANHO_FONTE_ANTIFONA = Pt(66)
+DEFAULT_TAMANHO_FONTE_LEITURA_TITULO_AMARELO = Pt(90) # Seu valor
+DEFAULT_TAMANHO_FONTE_LEITURA_TEXTO_BRANCO = Pt(90)
+# <<< NOVA Constante para Palavra >>>
+DEFAULT_TAMANHO_FONTE_PALAVRA = Pt(80) # Padrão solicitado
+TAMANHO_TITULO_PARTE = Pt(60)
 TAMANHO_FONTE_TITULO_INICIAL = Pt(90)
 TAMANHO_FONTE_ORACAO = Pt(36)
 LINHAS_POR_SLIDE_VERSO = 4
 LINHAS_POR_SLIDE_ORACAO = 5
-LINHAS_POR_SLIDE_LEITURA = 5 # Limite para o texto branco da leitura
+LINHAS_POR_SLIDE_LEITURA = 5
+LINHAS_POR_SLIDE_PALAVRA = 6 # Limite para texto da Palavra
 NOME_FONTE = 'Arial'
 COR_REFRAO = RGBColor(255, 192, 0) # Amarelo
 COR_VERSO = RGBColor(255, 255, 255) # Branco
@@ -36,10 +37,11 @@ DEFAULT_TEXTS = {
     # COLE O DICIONÁRIO DEFAULT_TEXTS COMPLETO AQUI
      "Entrada": {"titulo": "CANTO DE ENTRADA", "refrao": ["SENHOR, EIS AQUI O TEU","POVO QUE VEM IMPLORAR","TEU PERDÃO","É GRANDE O NOSSO","PECADO, PORÉM É MAIOR O","TEU CORAÇÃO"], "versos": [["SABENDO QUE","ACOLHESTE ZAQUEU, O","COBRADOR E ASSIM LHE","DEVOLVESTE TUA PAZ E","TEU AMOR TAMBÉM"],["NOS COLOCAMOS AO","LADO DOS QUE VÃO","BUSCAR NO TEU ALTAR A","GRAÇA DO PERDÃO"],["REVENDO EM MADALENA","A NOSSA PRÓPRIA FÉ","CHORANDO NOSSAS","PENAS DIANTE DOS TEUS","PÉS TAMBÉM"],["NÓS DESEJAMOS O","NOSSO AMOR TE DAR","PORQUE SÓ MUITO","AMOR NOS PODE","LIBERTAR"],["MOTIVOS TEMOS NÓS","DE SEMPRE CONFIAR,","DE ERGUER A NOSSA VOZ,","DE NÃO DESESPERAR,","OLHANDO AQUELE GESTO"],["QUE O BOM LADRÃO","SALVOU,","NÃO FOI, TAMBÉM, POR","NÓS,","TEU SANGUE QUE JORROU?"]]},
      "Ato Penitencial": {"titulo": "ATO PENITENCIAL", "refrao": [], "versos": []},
-     # <<< LEITURAS: 'titulo_amarelo' e 'texto_branco' >>>
-     "1ª Leitura": {"titulo_amarelo": ["PRIMEIRA LEITURA", "Josue 5,9a.10-12"], "texto_branco": [] }, # Juntando título e ref padrão
-     "Salmo": {"titulo_amarelo": ["SALMO 33 (34)", "Salmo(33 e 34)"], "texto_branco": ["- Louvo a Vós Senhor"] },
-     "2ª Leitura": {"titulo_amarelo": ["SEGUNDA LEITURA", "2Corintíos 5,17-21"], "texto_branco": [] },
+     # <<< PALAVRA AGORA É EDITÁVEL >>>
+     "Palavra": {"titulo": "PALAVRA", "texto": ["DESÇA COMO A CHUVA A TUA","PALAVRA. QUE SE ESPALHE","COMO ORVALHO. COMO","CHUVISCO NA RELVA. COMO","AGUACEIRO NA GRAMA.","AMÉM!"]},
+     "1ª Leitura": {"titulo_amarelo": ["PRIMEIRA LEITURA", ], "texto_branco": ["Josue 5,9a.10-12"] },
+     "Salmo": {"titulo_amarelo": ["SALMO 33 (34)"], "texto_branco": ["-Louvo a Vós Senhor"] },
+     "2ª Leitura": {"titulo_amarelo": ["SEGUNDA LEITURA", ], "texto_branco": ["2Corintíos 5,17-21"] },
      "Aclamação": {"titulo": "ACLAMAÇÃO DO EVANGELHO", "aclamacao_texto": ["Louvor e honra a vós, Senhor Jesus."], "antifona_texto": ["Vou levantar-me e vou a meu pai","e lhe direi: Meu pai, eu pequei","contra o céu e contra ti.","(Lc 15,1-3.11-32)"]},
      "Oferendas": {"titulo": "PREPARAÇÃO DAS OFERENDAS", "refrao": ["CONFIEI NO TEU AMOR E","VOLTEI, SIM, AQUI É MEU","LUGAR. EU GASTEI TEUS","BENS, Ó PAI, E TE DOU","ESTE PRANTO EM MINHAS","MÃOS"], "versos": [["MUITO ALEGRE EU TE","PEDI O QUE ERA MEU","PARTI, UM SONHO TÃO","NORMAL"],["DISSIPEI MEUS BENS E","O CORAÇÃO TAMBÉM","NO FIM, MEU MUNDO","ERA IRREAL"],["MIL AMIGOS CONHECI,","DISSERAM ADEUS","CAIU A SOLIDÃO EM","MIM"],["UM PATRÃO CRUEL","LEVOU-ME A REFLETIR","MEU PAI NÃO TRATA","UM SERVO ASSIM"],["NEM DEIXASTE-ME","FALAR DA INGRATIDÃO","MORREU NO ABRAÇO","O MAL QUE EU FIZ"],["FESTA, ROUPA NOVA,","ANEL, SANDÁLIA AOS","PÉS","VOLTEI À VIDA, SOU","FELIZ"]]},
      "Comunhão": {"titulo": "COMUNHÃO", "refrao": ["PROVAI E VEDE COMO DEUS É","BOM FELIZ DE QUEM NO SEU","AMOR CONFIA EM JESUS","CRISTO, SE FAZ GRAÇA E DOM","SE FAZ PALAVRA E PÃO ΝΑ","EUCARISTIA"], "versos": [["Ó PAI, TEU POVO BUSCA VIDA","NOVA NA DIREÇÃO DA PÁSCOA","DE JESUS EM NOSSA FRONTE, O","SINAL DAS CINZAS NA","CAMINHADA,","VEM SER FORÇA E LUZ"],["QUANDO, NA VIDA, ANDAMOS","NO DESERTO E A TENTAÇÃO","VEM NOS TIRAR A PAZ A","FORTALEZA E A PALAVRA","CERTA EM TI BUSCAMOS, DEUS","DE NOSSOS PAIS"],["PEREGRINAMOS ENTRE LUZ E","SOMBRAS A CRUZ NOS PESA, O","MAL NOS DESFIGURA MAS NA","ORAÇÃO E NA PALAVRA","ACHAMOS A TUA GRAÇA, QUE","NOS TRANSFIGURA"],["Ó DEUS, CONHECES NOSSO","SOFRIMENTO HÁ MUITA DOR, É","GRANDE A AFLIÇÃO","TRANSFORMA EM FESTA NOSSA","DOR-LAMENTO ACOLHE OS","FRUTOS BONS DA CONVERSÃO"],["QUANDO O PECADO NOS","CONSOME E FERE E EM TI","BUSCAMOS A PAZ DO PERDÃO","O NOSSO RIO DE AFLIÇÃO SE","PERDE NO MAR PROFUNDO DO","TEU CORAÇÃO"],["POR QUE FICAR EM COISAS JÁ","PASSADAS? O TEU PERDÃO","LIBERTA E NOS RENOVA O TEU","AMOR NOS ABRE NOVA","ESTRADA TRAZ ALEGRIA E PAZ,","NOS REVIGORA"]]},
@@ -48,10 +50,8 @@ DEFAULT_TEXTS = {
     # ===========================================================
 }
 
-
 # --- Textos Fixos ---
-# (Cole os textos fixos completos)
-TEXTO_PALAVRA_INTRO = ["DESÇA COMO A CHUVA A TUA","PALAVRA. QUE SE ESPALHE","COMO ORVALHO. COMO","CHUVISCO NA RELVA. COMO","AGUACEIRO NA GRAMA.","AMÉM!"]
+# (TEXTO_PALAVRA_INTRO Removido)
 TEXTO_CREDO = [ "CREIO EM DEUS PAI TODO PODEROSO,", "CRIADOR DO CÉU E DA TERRA.", # ... etc
                "E EM JESUS CRISTO, SEU ÚNICO FILHO,", "NOSSO SENHOR,",
                "QUE FOI CONCEBIDO PELO PODER DO ESPÍRITO SANTO;", "NASCEU DA VIRGEM MARIA;",
@@ -106,31 +106,37 @@ def adiciona_texto_com_divisao(prs, layout, linhas_originais, cor, tamanho_fonte
 class MassSlideGeneratorApp:
     def __init__(self, master):
         self.master = master
-        master.title("Gerador de Slides v19 (Leitura Título Replace)")
+        master.title("Gerador de Slides v20 (Palavra Editável)")
         master.geometry("850x800")
         title_frame = ttk.Frame(master, padding="10"); title_frame.pack(fill="x", padx=10, pady=(5, 0))
         ttk.Label(title_frame, text="Título Inicial da Apresentação:", font=('Arial', 11, 'bold')).pack(anchor='w')
         self.initial_title_widget = scrolledtext.ScrolledText(title_frame, height=3, width=90, wrap=tk.WORD, font=('Arial', 10)); self.initial_title_widget.pack(fill="x", expand=True, pady=(2, 5))
         self.initial_title_widget.insert(tk.END, "4º DOMINGO DA\nQUARESMA")
         self.notebook = ttk.Notebook(master)
-        self.ordem_gui = [ "Entrada", "Ato Penitencial", "1ª Leitura", "Salmo", "2ª Leitura", "Aclamação", "Oferendas", "Comunhão", ]
+
+        # <<< ORDEM GUI INCLUI PALAVRA >>>
+        self.ordem_gui = [
+            "Entrada", "Ato Penitencial", "Palavra", # Palavra adicionada aqui
+            "1ª Leitura", "Salmo", "2ª Leitura",
+            "Aclamação", "Oferendas", "Comunhão",
+        ]
         self.widgets_gui = {}
 
         for nome_parte in self.ordem_gui:
             frame = ttk.Frame(self.notebook, padding="10")
             self.notebook.add(frame, text=nome_parte)
             self.widgets_gui[nome_parte] = {}
-            # <<< Pega o título amarelo PADRÃO para exibir na GUI >>>
-            titulo_amarelo_padrao = DEFAULT_TEXTS.get(nome_parte, {}).get("titulo_amarelo", [nome_parte.upper()])
+            titulo_amarelo_padrao = DEFAULT_TEXTS.get(nome_parte, {}).get("titulo_amarelo", []) # Usado para leituras
+            titulo_sugerido = DEFAULT_TEXTS.get(nome_parte, {}).get("titulo", nome_parte.upper()) # Usado para outros
 
+            # <<< Chama a função correta para criar widgets >>>
             if nome_parte in ["1ª Leitura", "Salmo", "2ª Leitura"]:
-                 # Passa o título amarelo padrão para a função de widget
                  self._criar_widgets_leitura_com_fonte(frame, nome_parte, self.widgets_gui[nome_parte], titulo_amarelo_padrao)
             elif nome_parte == "Aclamação":
-                 titulo_sugerido = DEFAULT_TEXTS.get(nome_parte, {}).get("titulo", nome_parte.upper())
                  self._criar_widgets_aclamacao_com_fonte(frame, nome_parte, self.widgets_gui[nome_parte], titulo_sugerido)
+            elif nome_parte == "Palavra": # <<< Novo ELIF para Palavra >>>
+                 self._criar_widgets_palavra_com_fonte(frame, nome_parte, self.widgets_gui[nome_parte], titulo_sugerido)
             else: # Assume musical padrão
-                 titulo_sugerido = DEFAULT_TEXTS.get(nome_parte, {}).get("titulo", nome_parte.upper())
                  self._criar_widgets_musica_com_fonte(frame, nome_parte, self.widgets_gui[nome_parte], titulo_sugerido)
 
         self.notebook.pack(expand=True, fill="both", padx=10, pady=5)
@@ -158,25 +164,19 @@ class MassSlideGeneratorApp:
         self._criar_spinbox_fonte(verso_frame, "Fonte:", DEFAULT_TAMANHO_FONTE_MUSICA_VERSO, data_dict, "verso_font_spinbox")
         data_dict["verso_widget"] = scrolledtext.ScrolledText(verso_frame, height=12, width=90, wrap=tk.WORD, font=('Arial', 10)); data_dict["verso_widget"].pack(fill="x", expand=True, padx=5, pady=(0,5))
 
-    # <<< WIDGET LEITURA CORRIGIDO >>>
     def _criar_widgets_leitura_com_fonte(self, parent_frame, nome_parte, data_dict, titulo_amarelo_padrao_list):
+        # (Função igual à v19 - OMITIDA)
         data_dict["tipo"] = "leitura"
-        # Não guarda mais o título fixo aqui, ele vem do DEFAULT_TEXTS na geração
-
-        # Frame para Título/Referência Amarelo + Fonte
         ref_frame = ttk.Frame(parent_frame); ref_frame.pack(fill='x', expand=True)
-        ttk.Label(ref_frame, text=f"Título/Referência - {nome_parte} (Amarelo): [Vazio = Padrão]", font=('Arial', 10, 'bold')).pack(pady=(5,2), anchor='w')
-        self._criar_spinbox_fonte(ref_frame, "Fonte:", DEFAULT_TAMANHO_FONTE_LEITURA_TITULO_AMARELO, data_dict, "titulo_amarelo_font_spinbox") # Chave do spinbox
+        ttk.Label(ref_frame, text=f"Título/Referência - {nome_parte} (Amarelo):", font=('Arial', 10, 'bold')).pack(pady=(5,2), anchor='w')
+        self._criar_spinbox_fonte(ref_frame, "Fonte:", DEFAULT_TAMANHO_FONTE_LEITURA_TITULO_AMARELO, data_dict, "titulo_amarelo_font_spinbox")
         data_dict["titulo_amarelo_widget"] = scrolledtext.ScrolledText(ref_frame, height=4, width=90, wrap=tk.WORD, font=('Arial', 10)); data_dict["titulo_amarelo_widget"].pack(fill="x", expand=True, padx=5, pady=(0,5))
-        # Preenche widget com o padrão
         if titulo_amarelo_padrao_list: data_dict["titulo_amarelo_widget"].insert(tk.END, "\n".join(titulo_amarelo_padrao_list))
-
-        # Frame para Texto Branco + Fonte
         texto_frame = ttk.Frame(parent_frame); texto_frame.pack(fill='both', expand=True)
-        ttk.Label(texto_frame, text=f"Texto Principal - {nome_parte} (Branco): [Vazio = Padrão]", font=('Arial', 10, 'bold')).pack(pady=(10,2), anchor='w')
-        self._criar_spinbox_fonte(texto_frame, "Fonte:", DEFAULT_TAMANHO_FONTE_LEITURA_TEXTO_BRANCO, data_dict, "texto_branco_font_spinbox") # Chave do spinbox
+        ttk.Label(texto_frame, text=f"Texto Principal - {nome_parte} (Branco):", font=('Arial', 10, 'bold')).pack(pady=(10,2), anchor='w')
+        self._criar_spinbox_fonte(texto_frame, "Fonte:", DEFAULT_TAMANHO_FONTE_LEITURA_TEXTO_BRANCO, data_dict, "texto_branco_font_spinbox")
         data_dict["texto_branco_widget"] = scrolledtext.ScrolledText(texto_frame, height=18, width=90, wrap=tk.WORD, font=('Arial', 10)); data_dict["texto_branco_widget"].pack(fill="both", expand=True, padx=5, pady=(0,5))
-        default_txt = DEFAULT_TEXTS.get(nome_parte, {}).get("texto_branco", []) # Usa chave correta
+        default_txt = DEFAULT_TEXTS.get(nome_parte, {}).get("texto_branco", [])
         if default_txt: data_dict["texto_branco_widget"].insert(tk.END, "\n".join(default_txt))
 
     def _criar_widgets_aclamacao_com_fonte(self, parent_frame, nome_parte, data_dict, titulo_sugerido):
@@ -194,6 +194,20 @@ class MassSlideGeneratorApp:
         data_dict["antifona_widget"] = scrolledtext.ScrolledText(antifona_frame, height=15, width=90, wrap=tk.WORD, font=('Arial', 10)); data_dict["antifona_widget"].pack(fill="x", expand=True, padx=5, pady=(0,5))
         default_antifona = DEFAULT_TEXTS.get(nome_parte, {}).get("antifona_texto", []);
         if default_antifona: data_dict["antifona_widget"].insert(tk.END, "\n".join(default_antifona))
+
+    # <<< NOVA FUNÇÃO PARA WIDGETS DA PALAVRA >>>
+    def _criar_widgets_palavra_com_fonte(self, parent_frame, nome_parte, data_dict, titulo_sugerido):
+        data_dict["tipo"] = "palavra"
+        data_dict["titulo_geracao"] = titulo_sugerido # "PALAVRA"
+
+        # Frame para Texto + Fonte
+        texto_frame = ttk.Frame(parent_frame); texto_frame.pack(fill='both', expand=True)
+        ttk.Label(texto_frame, text=f"Texto - {nome_parte} (Amarelo):", font=('Arial', 10, 'bold')).pack(pady=(5,2), anchor='w')
+        # Spinbox para o texto (amarelo)
+        self._criar_spinbox_fonte(texto_frame, "Fonte:", DEFAULT_TAMANHO_FONTE_PALAVRA, data_dict, "texto_font_spinbox")
+        data_dict["texto_widget"] = scrolledtext.ScrolledText(texto_frame, height=25, width=90, wrap=tk.WORD, font=('Arial', 10)); data_dict["texto_widget"].pack(fill="both", expand=True, padx=5, pady=(0,5))
+        default_txt = DEFAULT_TEXTS.get(nome_parte, {}).get("texto", [])
+        if default_txt: data_dict["texto_widget"].insert(tk.END, "\n".join(default_txt))
 
 
     def gerar_apresentacao(self):
@@ -213,7 +227,7 @@ class MassSlideGeneratorApp:
 
             # --- Funções Auxiliares ---
             def _get_font_size_from_spinbox(widget, default_pt_value):
-                # Função auxiliar para obter tamanho de fonte do spinbox
+                # (Função igual à v16)
                 try:
                     valor_str = widget.get()
                     valor_int = int(valor_str)
@@ -258,57 +272,32 @@ class MassSlideGeneratorApp:
                 return conteudo_adicionado_total
 
 
-            # <<< FUNÇÃO LEITURA CORRIGIDA >>>
+            # Função adicionar_leitura_slide_unico (igual v19 - OMITIDA)
             def adicionar_leitura_slide_unico(nome_parte_gui):
                  conteudo_adicionado = False
-                 if nome_parte_gui in self.widgets_gui and self.widgets_gui[nome_parte_gui]["tipo"] == "leitura": # Verifica o tipo correto
+                 if nome_parte_gui in self.widgets_gui and self.widgets_gui[nome_parte_gui]["tipo"] == "leitura":
                      data_gui = self.widgets_gui[nome_parte_gui]
-                     # Pega textos da GUI
-                     titulo_amarelo_gui_str = data_gui["titulo_amarelo_widget"].get("1.0", tk.END).strip() # Nome correto do widget
-                     texto_branco_gui_str = data_gui["texto_branco_widget"].get("1.0", tk.END).strip() # Nome correto do widget
-                     # Pega tamanhos das fontes
-                     tamanho_fonte_titulo_amarelo = _get_font_size_from_spinbox(data_gui.get("titulo_amarelo_font_spinbox"), DEFAULT_TAMANHO_FONTE_LEITURA_TITULO_AMARELO) # Chave correta
-                     tamanho_fonte_texto_branco = _get_font_size_from_spinbox(data_gui.get("texto_branco_font_spinbox"), DEFAULT_TAMANHO_FONTE_LEITURA_TEXTO_BRANCO) # Chave correta
-
-                     defaults = DEFAULT_TEXTS.get(nome_parte_gui, {})
-                     titulo_amarelo_padrao = defaults.get("titulo_amarelo", []) # Chave correta
-                     texto_branco_padrao = defaults.get("texto_branco", []) # Chave correta
-                     # Decide finais
+                     titulo_amarelo_gui_str = data_gui["titulo_amarelo_widget"].get("1.0", tk.END).strip()
+                     texto_branco_gui_str = data_gui["texto_branco_widget"].get("1.0", tk.END).strip()
+                     tamanho_fonte_titulo_amarelo = _get_font_size_from_spinbox(data_gui.get("titulo_amarelo_font_spinbox"), DEFAULT_TAMANHO_FONTE_LEITURA_TITULO_AMARELO)
+                     tamanho_fonte_texto_branco = _get_font_size_from_spinbox(data_gui.get("texto_branco_font_spinbox"), DEFAULT_TAMANHO_FONTE_LEITURA_TEXTO_BRANCO)
+                     defaults = DEFAULT_TEXTS.get(nome_parte_gui, {}); titulo_amarelo_padrao = defaults.get("titulo_amarelo", []); texto_branco_padrao = defaults.get("texto_branco", [])
                      titulo_amarelo_final = [l.strip() for l in titulo_amarelo_gui_str.split('\n') if l.strip()] if titulo_amarelo_gui_str else titulo_amarelo_padrao
                      texto_branco_final = [l.strip() for l in texto_branco_gui_str.split('\n') if l.strip()] if texto_branco_gui_str else texto_branco_padrao
-
-                     # Cria slide único para Título Amarelo + Texto Branco (se houver um dos dois)
                      if titulo_amarelo_final or texto_branco_final:
-                         slide = prs.slides.add_slide(layout_slide_branco)
-                         conteudo_adicionado = True
-
+                         slide = prs.slides.add_slide(layout_slide_branco); conteudo_adicionado = True
                          esquerda = MARGEM_TEXTO; topo = MARGEM_TEXTO; largura = LARGURA_SLIDE - (2 * MARGEM_TEXTO); altura = ALTURA_SLIDE - (2 * MARGEM_TEXTO)
-                         caixa_texto = slide.shapes.add_textbox(esquerda, topo, largura, altura)
-                         frame_texto = caixa_texto.text_frame; frame_texto.clear(); frame_texto.word_wrap = True
+                         caixa_texto = slide.shapes.add_textbox(esquerda, topo, largura, altura); frame_texto = caixa_texto.text_frame; frame_texto.clear(); frame_texto.word_wrap = True
                          frame_texto.vertical_anchor = MSO_ANCHOR.MIDDLE; frame_texto.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
-
-                         # 1. Adiciona Título/Referência (Amarelo)
                          if titulo_amarelo_final:
-                             p_titulo = frame_texto.add_paragraph()
-                             texto_titulo_continuo = " ".join(titulo_amarelo_final)
-                             p_titulo.text = texto_titulo_continuo; p_titulo.alignment = PP_ALIGN.CENTER; p_titulo.font.name = NOME_FONTE
-                             p_titulo.font.size = tamanho_fonte_titulo_amarelo # Usa tamanho da GUI/Default
-                             p_titulo.font.color.rgb = COR_REFRAO; p_titulo.font.bold = True # Amarelo
-
-                         # 2. Adiciona Texto Principal (Branco)
+                             p_titulo = frame_texto.add_paragraph(); texto_titulo_continuo = " ".join(titulo_amarelo_final); p_titulo.text = texto_titulo_continuo; p_titulo.alignment = PP_ALIGN.CENTER; p_titulo.font.name = NOME_FONTE
+                             p_titulo.font.size = tamanho_fonte_titulo_amarelo; p_titulo.font.color.rgb = COR_REFRAO; p_titulo.font.bold = True
                          if texto_branco_final:
-                              # Adiciona espaço se ambos existirem
                              if titulo_amarelo_final: p_espaco = frame_texto.add_paragraph(); p_espaco.text = ""
-                             p_texto = frame_texto.add_paragraph()
-                             texto_principal_continuo = " ".join(texto_branco_final)
-                             p_texto.text = texto_principal_continuo; p_texto.alignment = PP_ALIGN.CENTER; p_texto.font.name = NOME_FONTE
-                             p_texto.font.size = tamanho_fonte_texto_branco # Usa tamanho da GUI/Default
-                             p_texto.font.color.rgb = COR_VERSO; p_texto.font.bold = True # Branco
-
+                             p_texto = frame_texto.add_paragraph(); texto_principal_continuo = " ".join(texto_branco_final); p_texto.text = texto_principal_continuo; p_texto.alignment = PP_ALIGN.CENTER; p_texto.font.name = NOME_FONTE
+                             p_texto.font.size = tamanho_fonte_texto_branco; p_texto.font.color.rgb = COR_VERSO; p_texto.font.bold = True
                          try: caixa_texto.left = esquerda; caixa_texto.top = topo; caixa_texto.width = largura; caixa_texto.height = altura; frame_texto.margin_bottom = Inches(0.05); frame_texto.margin_top = Inches(0.05); frame_texto.margin_left = Inches(0.1); frame_texto.margin_right = Inches(0.1)
                          except Exception as e_resize: print(f"Aviso: resize caixa leitura: {e_resize}")
-
-                 # Não adiciona slide de título de seção separado
                  return conteudo_adicionado
 
 
@@ -347,38 +336,77 @@ class MassSlideGeneratorApp:
                  if (titulo_adicionado or conteudo_adicionado) and add_separador: prs.slides.add_slide(layout_slide_branco); print(f"Separador após {titulo_secao}")
                  return titulo_adicionado or conteudo_adicionado
 
+            # <<< NOVA FUNÇÃO PARA SEÇÃO PALAVRA >>>
+            def adicionar_secao_palavra(nome_parte_gui):
+                conteudo_adicionado_total = False
+                if nome_parte_gui in self.widgets_gui and self.widgets_gui[nome_parte_gui]["tipo"] == "palavra":
+                    data_gui = self.widgets_gui[nome_parte_gui]
+                    titulo_secao = data_gui["titulo_geracao"] # "PALAVRA"
+                    texto_gui_str = data_gui["texto_widget"].get("1.0", tk.END).strip()
+                    tamanho_fonte = _get_font_size_from_spinbox(data_gui.get("texto_font_spinbox"), DEFAULT_TAMANHO_FONTE_PALAVRA)
+                    defaults = DEFAULT_TEXTS.get(nome_parte_gui, {})
+                    texto_padrao = defaults.get("texto", [])
+                    texto_final = [l.strip() for l in texto_gui_str.split('\n') if l.strip()] if texto_gui_str else texto_padrao
+
+                    if texto_final:
+                        # Adiciona slide de título da seção
+                        titulo_adicionado = adiciona_texto_com_divisao(prs, layout_slide_branco, [titulo_secao], COR_TITULO, TAMANHO_TITULO_PARTE, 5, use_auto_size=False)
+                        if titulo_adicionado: conteudo_adicionado_total = True
+
+                        # Adiciona slide(s) para o texto (Amarelo)
+                        texto_adicionado = adiciona_texto_com_divisao(
+                            prs, layout_slide_branco,
+                            texto_final,
+                            COR_TITULO, # Cor Amarela para o texto da palavra
+                            tamanho_fonte,
+                            LINHAS_POR_SLIDE_PALAVRA,
+                            bold=True,
+                            use_auto_size=True
+                        )
+                        if texto_adicionado: conteudo_adicionado_total = True
+                return conteudo_adicionado_total
+
 
             # --- Montagem da Apresentação ---
-            # (Lógica de montagem igual à v15)
-            ordem_final_geracao = [ "Entrada", "Ato Penitencial", "PALAVRA_INTRO", "1ª Leitura", "Salmo", "2ª Leitura", "Aclamação", "CREDO", "PRECES", "Oferendas", "SANTO_TITULO", "ORACAO_EUCARISTICA", "CORDEIRO_TITULO", "Comunhão", "Pós-Comunhão", "SANTA_LUZIA", "AVISOS", "Final" ]
+            ordem_final_geracao = [ "Entrada", "Ato Penitencial", "Palavra", # Usar nome da aba "Palavra"
+                                     "1ª Leitura", "Salmo", "2ª Leitura", "Aclamação", "CREDO", "PRECES", "Oferendas",
+                                     "SANTO_TITULO", "ORACAO_EUCARISTICA", "CORDEIRO_TITULO", "Comunhão", "Pós-Comunhão",
+                                     "SANTA_LUZIA", "AVISOS", "Final" ]
             initial_title_str = self.initial_title_widget.get("1.0", tk.END).strip(); initial_title_lines = [l.strip() for l in initial_title_str.split('\n') if l.strip()]
             if initial_title_lines:
                  titulo_inicial_adicionado = adiciona_texto_com_divisao(prs, layout_slide_branco, initial_title_lines, COR_TITULO, TAMANHO_FONTE_TITULO_INICIAL, 5, use_auto_size=True)
                  if titulo_inicial_adicionado: prs.slides.add_slide(layout_slide_branco)
+
             for nome_parte in ordem_final_geracao:
                 separador_necessario = False
-                if nome_parte == "PALAVRA_INTRO": separador_necessario = adicionar_secao_fixa("PALAVRA", TEXTO_PALAVRA_INTRO, Pt(90), 6, cor=COR_TITULO, add_separador=False)
-                elif nome_parte == "CREDO": separador_necessario = adicionar_secao_fixa("ORAÇÃO DO CREDO", TEXTO_CREDO, Pt(83), 4,use_auto_size_content=True)
+                # <<< CHAMADAS ATUALIZADAS >>>
+                # Trata primeiro os marcadores e seções fixas
+                
+                if nome_parte == "PALAVRA_INTRO": separador_necessario = adicionar_secao_fixa("PALAVRA", TEXTO_PALAVRA_INTRO, Pt(80), 6, cor=COR_TITULO, add_separador=False,use_auto_size_content=True)
+                elif nome_parte == "CREDO": separador_necessario = adicionar_secao_fixa("ORAÇÃO DO CREDO", TEXTO_CREDO, Pt(83), 3,use_auto_size_content=True,add_separador=False)
                 elif nome_parte == "PRECES": separador_necessario = adicionar_secao_fixa("PRECES", [], TAMANHO_TITULO_PARTE, 1,),
                 elif nome_parte == "ORACAO_EUCARISTICA": separador_necessario = adicionar_secao_fixa("ORAÇÃO EUCARÍSTICA", [], TAMANHO_TITULO_PARTE, 2)
                 elif nome_parte == "SANTA_LUZIA": separador_necessario = adicionar_secao_fixa("ORAÇÃO A SANTA LUZIA", TEXTO_ORACAO_SANTA_LUZIA, Pt(80), LINHAS_POR_SLIDE_ORACAO,use_auto_size_content=True)
                 elif nome_parte == "AVISOS": separador_necessario = adicionar_secao_fixa("AVISOS", TEXTO_AVISOS, Pt(90), 4, add_separador=False, bold_content=False, use_auto_size_content=True)
                 elif nome_parte in ["1ª Leitura", "Salmo", "2ª Leitura"]:
                     separador_necessario = adicionar_leitura_slide_unico(nome_parte)
-                    # <<< Lógica de separador APÓS CADA LEITURA >>>
-                    if separador_necessario:
-                       prs.slides.add_slide(layout_slide_branco)
-                       print(f"Separador adicionado após {nome_parte}")
                 elif nome_parte == "Aclamação":
                     separador_necessario = adicionar_aclamacao_slide_unico(nome_parte)
-                    if separador_necessario: prs.slides.add_slide(layout_slide_branco)
-                elif nome_parte in self.widgets_gui or nome_parte in ["Pós-Comunhão", "Final"]:
+                elif nome_parte in self.widgets_gui or nome_parte in ["Pós-Comunhão", "Final"]: # Outras partes musicais
                     separador_necessario = adicionar_secao_musical(nome_parte)
-                    if separador_necessario and nome_parte != ordem_final_geracao[-1]: prs.slides.add_slide(layout_slide_branco)
+
+                # Adiciona separador (lógica geral)
+                if separador_necessario and nome_parte != ordem_final_geracao[-1]:
+                     # Exceção: Não adicionar separador *antes* da 1a Leitura se a Palavra foi adicionada
+                     index_atual = ordem_final_geracao.index(nome_parte)
+                     if not (nome_parte == "Palavra" and index_atual + 1 < len(ordem_final_geracao) and ordem_final_geracao[index_atual+1] == "1ª Leitura"):
+                          prs.slides.add_slide(layout_slide_branco)
+                          print(f"Separador adicionado após {nome_parte}")
+
 
             # --- Salvar ---
             # (Lógica de salvar igual)
-            filepath = filedialog.asksaveasfilename( defaultextension=".pptx", filetypes=[("PowerPoint Presentations", "*.pptx"), ("All Files", "*.*")], title="Salvar Apresentação Como...", initialfile="Missa_Gerada_v19.pptx" )
+            filepath = filedialog.asksaveasfilename( defaultextension=".pptx", filetypes=[("PowerPoint Presentations", "*.pptx"), ("All Files", "*.*")], title="Salvar Apresentação Como...", initialfile="Missa_Gerada_v20.pptx" )
             if not filepath: self.status_label.config(text="Geração cancelada."); return
             prs.save(filepath)
             self.status_label.config(text=f"Salvo: {os.path.basename(filepath)}")
@@ -395,10 +423,8 @@ class MassSlideGeneratorApp:
 # --- Iniciar a Aplicação ---
 if __name__ == "__main__":
     # (Colar dicionários completos aqui)
-    if 'Entrada' not in DEFAULT_TEXTS or '1ª Leitura' not in DEFAULT_TEXTS or 'Aclamação' not in DEFAULT_TEXTS or not TEXTO_CREDO or not TEXTO_ORACAO_SANTA_LUZIA: print("ERRO CRÍTICO: Dicionários de texto padrão não estão completos!"); exit()
+    if 'Entrada' not in DEFAULT_TEXTS or 'Palavra' not in DEFAULT_TEXTS or '1ª Leitura' not in DEFAULT_TEXTS or 'Aclamação' not in DEFAULT_TEXTS or not TEXTO_CREDO or not TEXTO_ORACAO_SANTA_LUZIA: print("ERRO CRÍTICO: Dicionários de texto padrão não estão completos!"); exit()
     root = tk.Tk()
     app = MassSlideGeneratorApp(root)
     root.mainloop()
 
-
- 
