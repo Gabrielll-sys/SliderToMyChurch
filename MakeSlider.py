@@ -1,3 +1,4 @@
+import sys
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox, filedialog
 import os
@@ -5,7 +6,7 @@ import platform
 import subprocess
 # import tkinter.font as tkFont # Manter comentado por enquanto
 from pptx import Presentation
-from pptx.util import Inches, Pt
+from pptx.util import Inches, Pt, Cm # Adicionar Cm
 from pptx.dml.color import RGBColor
 from pptx.enum.text import MSO_ANCHOR, PP_ALIGN, MSO_AUTO_SIZE
 
@@ -13,7 +14,7 @@ from pptx.enum.text import MSO_ANCHOR, PP_ALIGN, MSO_AUTO_SIZE
 # (Copie as constantes da sua versão funcional mais recente - v23)
 LARGURA_SLIDE = Inches(16)
 ALTURA_SLIDE = Inches(9)
-MARGEM_TEXTO = Inches(0.1)
+MARGEM_TEXTO = Inches(0.04)
 NOME_FONTE_PADRAO = 'Arial'
 FONTES_COMUNS_PPT = sorted([ # Lista da v23
     "Arial", "Arial Black", "Arial Narrow", "Bahnschrift", "Calibri", "Calibri Light",
@@ -41,7 +42,7 @@ DEFAULT_TAMANHO_FONTE_ANTIFONA = Pt(66)
 DEFAULT_TAMANHO_FONTE_LEITURA_TITULO_AMARELO = Pt(90)
 DEFAULT_TAMANHO_FONTE_LEITURA_TEXTO_BRANCO = Pt(90)
 DEFAULT_TAMANHO_FONTE_PALAVRA = Pt(80)
-TAMANHO_TITULO_PARTE = Pt(60)
+TAMANHO_TITULO_PARTE = Pt(96)
 TAMANHO_FONTE_TITULO_INICIAL = Pt(90)
 TAMANHO_FONTE_ORACAO = Pt(36)
 LINHAS_POR_SLIDE_VERSO = 4
@@ -127,7 +128,7 @@ def adiciona_texto_com_divisao(prs, layout, linhas_originais, cor, tamanho_fonte
 class MassSlideGeneratorApp:
     def __init__(self, master):
         self.master = master
-        master.title("Gerador de Slides v24 (Font Preview)")
+        master.title("Criador de Apresentação de Missa")
         master.geometry("900x850") # Aumentar largura para preview
         title_frame = ttk.Frame(master, padding="10"); title_frame.pack(fill="x", padx=10, pady=(5, 0))
         ttk.Label(title_frame, text="Título Inicial da Apresentação:", font=('Arial', 11, 'bold')).pack(anchor='w')
@@ -451,11 +452,7 @@ class MassSlideGeneratorApp:
                          use_auto_size=use_auto_size_content # Autoajuste para conteúdo
                      )
 
-                 # 3. Adiciona o SEPARADOR se algo foi adicionado e add_separador=True
-                 if (titulo_adicionado or conteudo_adicionado) and add_separador:
-                     prs.slides.add_slide(layout_slide_branco)
-                     print(f"Separador adicionado após {titulo_secao}")
-
+                
                  return titulo_adicionado or conteudo_adicionado
             def adicionar_secao_palavra(nome_parte_gui):
                 conteudo_adicionado_total = False
@@ -471,7 +468,56 @@ class MassSlideGeneratorApp:
                         texto_adicionado = adiciona_texto_com_divisao(prs, layout_slide_branco, texto_final, COR_TITULO, tamanho_fonte, nome_fonte, bold_state, italic_state, LINHAS_POR_SLIDE_PALAVRA, use_auto_size=True)
                         if texto_adicionado: conteudo_adicionado_total = True
                 return conteudo_adicionado_total
+# <<< FUNÇÃO PARA ADICIONAR AVISOS COM IMAGEM EM TELA CHEIA >>>
+            def adicionar_aviso_com_imagem(nome_arquivo_imagem):
+                slide_adicionado = False
+                # Lógica robusta para encontrar o caminho da imagem
+                if getattr(sys, 'frozen', False):
+                    application_path = os.path.dirname(sys.executable)
+                else:
+                    try: application_path = os.path.dirname(os.path.abspath(__file__))
+                    except NameError: application_path = os.getcwd()
+                caminho_imagem = os.path.join(application_path, nome_arquivo_imagem)
+                print(f"Tentando carregar imagem de avisos de: {caminho_imagem}")
 
+                if os.path.exists(caminho_imagem):
+                    try:
+                        # Adiciona um slide em branco
+                        slide_avisos = prs.slides.add_slide(layout_slide_branco)
+                        slide_adicionado = True
+
+                        # Define posição e tamanho para cobrir o slide
+                        img_left = Inches(0)  # Começa na borda esquerda
+                        img_top = Inches(0)   # Começa no topo
+                        img_width = LARGURA_SLIDE  # Largura total do slide
+                        img_height = ALTURA_SLIDE # Altura total do slide
+
+                        # Adiciona a imagem cobrindo o slide
+                        # Nota: Isso pode distorcer a imagem se a proporção não for 16:9
+                        pic = slide_avisos.shapes.add_picture(
+                            caminho_imagem,
+                            img_left,
+                            img_top,
+                            width=img_width,
+                            height=img_height
+                            
+                        )
+                        print(f"Imagem de Avisos '{nome_arquivo_imagem}' adicionada em tela cheia.")
+
+                    except Exception as e_img:
+                        print(f"Erro ao adicionar imagem de avisos '{nome_arquivo_imagem}': {e_img}")
+                        messagebox.showerror("Erro Imagem Avisos", f"Não foi possível adicionar a imagem de avisos:\n{e_img}")
+                        # Fallback: Adiciona título simples se imagem falhar
+                        adiciona_texto_com_divisao(prs, layout_slide_branco, ["AVISOS"], COR_TITULO, TAMANHO_TITULO_PARTE, NOME_FONTE_PADRAO, True, False, 5, use_auto_size=False)
+
+                else:
+                    print(f"Aviso: Arquivo de imagem de avisos '{caminho_imagem}' não encontrado.")
+                    messagebox.showwarning("Imagem Avisos Não Encontrada", f"O arquivo '{nome_arquivo_imagem}' não foi encontrado.\nVerifique se ele está na mesma pasta do script/executável.")
+                    # Fallback: Adiciona título simples se imagem não existe
+                    adiciona_texto_com_divisao(prs, layout_slide_branco, ["AVISOS"], COR_TITULO, TAMANHO_TITULO_PARTE, NOME_FONTE_PADRAO, True, False, 5, use_auto_size=False)
+                    slide_adicionado = True # Adicionou o slide de fallback
+
+                return slide_adicionado # Retorna True se um slide (imagem ou fallback) foi adicionado
 
             # --- Montagem da Apresentação ---
             # (Lógica de montagem igual à v19)
@@ -483,18 +529,23 @@ class MassSlideGeneratorApp:
             for nome_parte in ordem_final_geracao:
                 separador_necessario = False
                 if nome_parte == "PALAVRA_INTRO": separador_necessario = adicionar_secao_fixa("PALAVRA", "Sem Conteúdo", Pt(80), 6, cor=COR_TITULO, add_separador=False,use_auto_size_content=True)
-                elif nome_parte == "CREDO": separador_necessario = adicionar_secao_fixa("ORAÇÃO DO CREDO", TEXTO_CREDO, Pt(83), 3,use_auto_size_content=True,add_separador=False)
+                elif nome_parte == "CREDO": separador_necessario = adicionar_secao_fixa("ORAÇÃO DO CREDO", TEXTO_CREDO, Pt(83), 3,use_auto_size_content=True,)
                 elif nome_parte == "PRECES": separador_necessario = adicionar_secao_fixa("PRECES", [], TAMANHO_TITULO_PARTE, 1,),
+                elif nome_parte == "SANTO_TITULO": separador_necessario = adicionar_secao_fixa("SANTO", [], TAMANHO_TITULO_PARTE, 2)
                 elif nome_parte == "ORACAO_EUCARISTICA": separador_necessario = adicionar_secao_fixa("ORAÇÃO EUCARÍSTICA", [], TAMANHO_TITULO_PARTE, 2)
+                elif nome_parte == "CORDEIRO_TITULO": separador_necessario = adicionar_secao_fixa("CORDEIRO", [], TAMANHO_TITULO_PARTE, 2)
                 elif nome_parte == "SANTA_LUZIA": separador_necessario = adicionar_secao_fixa("ORAÇÃO A SANTA LUZIA", TEXTO_ORACAO_SANTA_LUZIA, Pt(80), LINHAS_POR_SLIDE_ORACAO,use_auto_size_content=True)
-                elif nome_parte == "AVISOS": separador_necessario = adicionar_secao_fixa("AVISOS", TEXTO_AVISOS, Pt(90), 4, add_separador=False, bold_content=False, use_auto_size_content=True)
+                # <<< Chama a nova função para AVISOS_IMG >>>
+                elif nome_parte == "AVISOS":
+                    separador_necessario = adicionar_aviso_com_imagem("AVISOS.png") # Passa o nome do arquivo aqui
+                    # Não adiciona separador extra DEPOIS dos avisos, pois é o penúltimo item antes de "Final"
                 elif nome_parte in ["1ª Leitura", "Salmo", "2ª Leitura"]: separador_necessario = adicionar_leitura_slide_unico(nome_parte)
                 elif nome_parte == "Palavra": separador_necessario = adicionar_secao_palavra(nome_parte)
                 elif nome_parte == "Aclamação": separador_necessario = adicionar_aclamacao_slide_unico(nome_parte)
                 elif nome_parte in self.widgets_gui or nome_parte in ["Pós-Comunhão", "Final"]: separador_necessario = adicionar_secao_musical(nome_parte)
-                if separador_necessario and nome_parte != ordem_final_geracao[-1]:
-                     prs.slides.add_slide(layout_slide_branco); print(f"Separador após {nome_parte}")
-
+                if separador_necessario and nome_parte != ordem_final_geracao[-1] and nome_parte != "AVISOS":
+                     prs.slides.add_slide(layout_slide_branco)
+                     print(f"Separador adicionado após {nome_parte}")
 
             # --- Salvar e Abrir ---
             # (Lógica de salvar e abrir igual à v21)
