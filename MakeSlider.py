@@ -1931,12 +1931,25 @@ class MassSlideGeneratorApp:
         if adiciona_texto_com_divisao(prs, layout_slide_branco, [titulo_secao], COR_TITULO, TAMANHO_TITULO_PARTE, NOME_FONTE_PADRAO, True, False, 5, use_auto_size=False): conteudo_adicionado = True
         slide = prs.slides.add_slide(layout_slide_branco); conteudo_adicionado = True 
         esquerda=MARGEM_TEXTO; topo=MARGEM_TEXTO; largura=LARGURA_SLIDE-(2*MARGEM_TEXTO); altura=ALTURA_SLIDE-(2*MARGEM_TEXTO)
-        caixa_texto = slide.shapes.add_textbox(esquerda,topo,largura,altura); frame_texto=caixa_texto.text_frame; frame_texto.clear(); frame_texto.word_wrap=True; frame_texto.vertical_anchor=MSO_ANCHOR.MIDDLE; frame_texto.auto_size=MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
-        # Adiciona todos os elementos em um único slide
-        if aclamacao_final:
-            # Primeiro o texto de proclamação e aleluia
+
+        if aclamacao_final and antifona_final:
+            # Aleluia no topo para liberar o máximo de área para a antífona.
+            altura_aclamacao = Inches(1.6) if len(aclamacao_final) <= 1 else Inches(2.1)
+            espaco_entre_blocos = Inches(0.12)
+            topo_aclamacao = topo
+            topo_antifona = topo_aclamacao + altura_aclamacao + espaco_entre_blocos
+            altura_antifona = (topo + altura) - topo_antifona
+            if altura_antifona < Inches(0.8):
+                altura_antifona = Inches(0.8)
+
+            caixa_aclamacao = slide.shapes.add_textbox(esquerda, topo_aclamacao, largura, altura_aclamacao)
+            frame_aclamacao = caixa_aclamacao.text_frame
+            frame_aclamacao.clear()
+            frame_aclamacao.word_wrap = True
+            frame_aclamacao.vertical_anchor = MSO_ANCHOR.TOP
+            frame_aclamacao.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
             for idx, linha in enumerate(aclamacao_final):
-                p = frame_texto.add_paragraph()
+                p = frame_aclamacao.paragraphs[0] if idx == 0 else frame_aclamacao.add_paragraph()
                 p.text = linha
                 p.alignment = PP_ALIGN.CENTER
                 p.font.name = nome_ac
@@ -1944,16 +1957,22 @@ class MassSlideGeneratorApp:
                 p.font.color.rgb = COR_REFRAO
                 p.font.bold = bold_ac
                 p.font.italic = italic_ac
-                if idx < len(aclamacao_final) - 1:
-                    frame_texto.add_paragraph().text = ""  # Espaço entre linhas
+            try:
+                frame_aclamacao.margin_bottom = Inches(0.03)
+                frame_aclamacao.margin_top = Inches(0.01)
+                frame_aclamacao.margin_left = Inches(0.1)
+                frame_aclamacao.margin_right = Inches(0.1)
+            except Exception:
+                pass
 
-        if antifona_final:
-            # Adiciona um espaço entre a aclamação e a antífona
-            frame_texto.add_paragraph().text = ""
-            
-            # Adiciona a antífona e versículo
+            caixa_antifona = slide.shapes.add_textbox(esquerda, topo_antifona, largura, altura_antifona)
+            frame_antifona = caixa_antifona.text_frame
+            frame_antifona.clear()
+            frame_antifona.word_wrap = True
+            frame_antifona.vertical_anchor = MSO_ANCHOR.TOP
+            frame_antifona.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
             for idx, linha in enumerate(antifona_final):
-                p = frame_texto.add_paragraph()
+                p = frame_antifona.paragraphs[0] if idx == 0 else frame_antifona.add_paragraph()
                 p.text = linha
                 p.alignment = PP_ALIGN.CENTER
                 p.font.name = nome_an
@@ -1961,8 +1980,42 @@ class MassSlideGeneratorApp:
                 p.font.color.rgb = COR_VERSO
                 p.font.bold = bold_an
                 p.font.italic = italic_an
-        try: caixa_texto.left=esquerda; caixa_texto.top=topo; caixa_texto.width=largura; caixa_texto.height=altura; frame_texto.margin_bottom=Inches(0.05); frame_texto.margin_top=Inches(0.05); frame_texto.margin_left=Inches(0.1); frame_texto.margin_right=Inches(0.1)
-        except Exception: pass
+            try:
+                frame_antifona.margin_bottom = Inches(0.04)
+                frame_antifona.margin_top = Inches(0.01)
+                frame_antifona.margin_left = Inches(0.1)
+                frame_antifona.margin_right = Inches(0.1)
+            except Exception:
+                pass
+        else:
+            linhas_unicas = aclamacao_final if aclamacao_final else antifona_final
+            cor_unica = COR_REFRAO if aclamacao_final else COR_VERSO
+            nome_unico = nome_ac if aclamacao_final else nome_an
+            tamanho_unico = tamanho_ac if aclamacao_final else tamanho_an
+            bold_unico = bold_ac if aclamacao_final else bold_an
+            italic_unico = italic_ac if aclamacao_final else italic_an
+            caixa_texto = slide.shapes.add_textbox(esquerda, topo, largura, altura)
+            frame_texto = caixa_texto.text_frame
+            frame_texto.clear()
+            frame_texto.word_wrap = True
+            frame_texto.vertical_anchor = MSO_ANCHOR.TOP
+            frame_texto.auto_size = MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+            for idx, linha in enumerate(linhas_unicas):
+                p = frame_texto.paragraphs[0] if idx == 0 else frame_texto.add_paragraph()
+                p.text = linha
+                p.alignment = PP_ALIGN.CENTER
+                p.font.name = nome_unico
+                p.font.size = tamanho_unico
+                p.font.color.rgb = cor_unica
+                p.font.bold = bold_unico
+                p.font.italic = italic_unico
+            try:
+                frame_texto.margin_bottom = Inches(0.04)
+                frame_texto.margin_top = Inches(0.01)
+                frame_texto.margin_left = Inches(0.1)
+                frame_texto.margin_right = Inches(0.1)
+            except Exception:
+                pass
         return conteudo_adicionado 
 
     def adicionar_secao_fixa(self, prs, layout_slide_branco, titulo_secao, texto_linhas, tamanho_fonte, linhas_por_slide_custom, cor=COR_VERSO, bold_content=True, use_auto_size_content=False):

@@ -158,34 +158,40 @@ function addAcclamationCombinedSlide(
 
   const slide = createSlide(pptx);
   if (acclamation.length > 0 && antiphon.length > 0) {
+    const topY = 0.2;
+    const blockGap = 0.12;
+    const acclamationHeight = Math.min(2.2, Math.max(1.2, acclamation.length * 0.95));
+    const antiphonY = topY + acclamationHeight + blockGap;
+    const antiphonHeight = Math.max(0.8, 8.8 - antiphonY);
+
     slide.addText(acclamation.join("\n"), {
       x: 0.2,
-      y: 0.35,
+      y: topY,
       w: 15.6,
-      h: 3.8,
+      h: acclamationHeight,
       fontFace: acclamationStyle.fontFace,
       align: "center",
-      valign: "middle",
+      valign: "top",
       color: COLOR_YELLOW,
       bold: acclamationStyle.bold,
       italic: acclamationStyle.italic,
       fontSize: acclamationStyle.fontSize,
-      margin: 0.04,
+      margin: 0.02,
       fit: "shrink",
     });
     slide.addText(antiphon.join("\n"), {
       x: 0.2,
-      y: 4.8,
+      y: antiphonY,
       w: 15.6,
-      h: 3.8,
+      h: antiphonHeight,
       fontFace: antiphonStyle.fontFace,
       align: "center",
-      valign: "middle",
+      valign: "top",
       color: COLOR_WHITE,
       bold: antiphonStyle.bold,
       italic: antiphonStyle.italic,
       fontSize: antiphonStyle.fontSize,
-      margin: 0.04,
+      margin: 0.02,
       fit: "shrink",
     });
     return 1;
