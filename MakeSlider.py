@@ -1,8 +1,12 @@
+# -*- coding: utf-8 -*-
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox, filedialog, simpledialog
+import json
 import os
 import platform
 import subprocess
+import threading
+from pathlib import Path
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
@@ -12,9 +16,23 @@ import copy
 import requests
 from datetime import date
 import re
-from tkinter import simpledialog, messagebox
 from tkinter import font as tkfont
 # --- Constantes de Configuração ---
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    BASE_DIR = Path(sys._MEIPASS)
+else:
+    BASE_DIR = Path(__file__).resolve().parent
+RESOURCES_DIR = BASE_DIR / "resources"
+
+def _load_json_resource(filename, default_value):
+    try:
+        path = RESOURCES_DIR / filename
+        if path.exists():
+            with path.open("r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Aviso: falha ao carregar {filename}: {e}")
+    return default_value
 LITURGIA_API_URL = "https://api-liturgia-diaria.vercel.app/"
 LARGURA_SLIDE = Inches(16)
 ALTURA_SLIDE = Inches(9)
@@ -43,13 +61,20 @@ UI_COLOR_BG = '#F7F7F7'
 UI_COLOR_ACCENT = '#1E90FF'
 UI_FONT_BASE = ('Arial', 10)
 UI_FONT_BOLD = ('Arial', 10, 'bold')
-FONTES_COMUNS_PPT = sorted([
+FONTES_COMUNS_PPT_FALLBACK = sorted([
     "Arial", "Arial Black", "Arial Narrow", "Bahnschrift", "Calibri", "Calibri Light", "Cambria", "Cambria Math", "Candara", "Candara Light", "Century", "Century Gothic", "Century Schoolbook", "Comic Sans MS", "Consolas", "Constantia", "Corbel", "Corbel Light", "Courier New", "Ebrima", "Franklin Gothic Medium", "Franklin Gothic Book", "Gabriola", "Gadugi", "Georgia", "Gill Sans MT", "Impact", "Ink Free", "Leelawadee UI", "Lucida Console", "Lucida Sans Unicode", "Malgun Gothic", "Marlett", "Microsoft Himalaya", "Microsoft JhengHei", "Microsoft JhengHei UI", "Microsoft New Tai Lue", "Microsoft PhagsPa", "Microsoft Sans Serif", "Microsoft Tai Le", "Microsoft YaHei", "Microsoft YaHei UI", "Microsoft Yi Baiti", "MingLiU-ExtB", "PMingLiU-ExtB", "MingLiU_HKSCS-ExtB", "Mongolian Baiti", "Montserrat", "MS Gothic", "MS UI Gothic", "MS PGothic", "MV Boli", "Myanmar Text", "Nirmala UI", "Palatino Linotype", "Rockwell", "Segoe Print", "Segoe Script", "Segoe UI", "Segoe UI Black", "Segoe UI Emoji", "Segoe UI Historic", "Segoe UI Semibold", "Segoe UI Semilight", "Segoe UI Symbol", "SimSun", "NSimSun", "SimSun-ExtB", "Sitka Banner", "Sitka Display", "Sitka Heading", "Sitka Small", "Sitka Subheading", "Sitka Text", "Sylfaen", "Symbol", "Tahoma", "Times New Roman", "Trebuchet MS", "Verdana", "Webdings", "Wingdings", "Wingdings 2", "Wingdings 3"
 ])
 COR_REFRAO = RGBColor(255, 192, 0); COR_VERSO = RGBColor(255, 255, 255)
 COR_TITULO = RGBColor(255, 192, 0); COR_FUNDO_PRETO = RGBColor(0, 0, 0)
 
-DEFAULT_TEXTS_ORIGINAL = {
+def _get_fontes_sistema():
+    try:
+        fontes = sorted(set(tkfont.families()))
+        return fontes or FONTES_COMUNS_PPT_FALLBACK
+    except Exception:
+        return FONTES_COMUNS_PPT_FALLBACK
+
+DEFAULT_TEXTS_ORIGINAL_FALLBACK = {
      "Entrada": {"titulo": "CANTO DE ENTRADA", "refrao": [], "versos": []},
      "Ato Penitencial": {"titulo": "ATO PENITENCIAL", "refrao": [], "versos": []},
      "Glória": {"titulo": "GLÓRIA", "refrao": [], "versos": []},
@@ -63,7 +88,7 @@ DEFAULT_TEXTS_ORIGINAL = {
 }
 
 # Conteúdos de Orações Eucarísticas (cada item é uma "oração" com suas linhas; linhas vazias indicam quebra manual de slide)
-ORACOES_EUCARISTICAS = {
+ORACOES_EUCARISTICAS_FALLBACK = {
     "ORAÇÃO EUCARÍSTICA Nº 03 — DIVERSAS CIRCUNSTÂNCIAS": [
         "SANTO",
         "",
@@ -294,8 +319,17 @@ ORACOES_EUCARISTICAS = {
         "GLÓRIA E LOUVOR AO PAI, QUE EM CRISTO NOS RECONCILIOU!",
     ],
 }
-TEXTO_CREDO = [ "CREIO EM DEUS PAI TODO PODEROSO,", "CRIADOR DO CÉU E DA TERRA.", "E EM JESUS CRISTO, SEU ÚNICO FILHO,", "NOSSO SENHOR,", "QUE FOI CONCEBIDO PELO PODER DO ESPÍRITO SANTO;", "NASCEU DA VIRGEM MARIA;", "PADECEU SOB PÔNCIO PILATOS,", "FOI CRUCIFICADO, MORTO E SEPULTADO.", "DESCEU À MANSÃO DOS MORTOS;", "RESSUSCITOU AO TERCEIRO DIA;", "SUBIU AOS CÉUS, ESTÁ SENTADO À DIREITA", "DE DEUS PAI TODO-PODEROSO,", "DONDE HÁ DE VIR A JULGAR OS VIVOS E OS MORTOS.", "CREIO NO ESPÍRITO SANTO,", "NA SANTA IGREJA CATÓLICA,", "NA COMUNHÃO DOS SANTOS,", "NA REMISSÃO DOS PECADOS,", "NA RESSURREIÇÃO DA CARNE,", "NA VIDA ETERNA.", "AMÉM." ]
-TEXTO_ORACAO_SANTA_LUZIA = [ "Ó VIRGEM ADMIRÁVEL.", "CHEIA DE FIRMEZA E DE", "CONSTÂNCIA, QUE NEM", "AS POMPAS HUMANAS", "PUDERAM SEDUZIR,", "NEM AS PROMESSAS,", "NEM AS AMEAÇAS,", "NEM A FORÇA BRUTA", "PUDERAM ABALAR,", "PORQUE SOUBESTES SER", "O TEMPLO VIVO DO", "DIVINO ESPÍRITO SANTO.", "O MUNDO CRISTÃO VOS", "PROCLAMOU ADVOGADA", "DA LUZ DOS NOSSOS", "OLHOS. DEFENDEI-NOS,", "POIS, DE TODA MOLÉSTIA", "QUE POSSA PREJUDICAR", "A NOSSA VISTA.", "ALCANÇAI-NOS A LUZ", "SOBRENATURAL DA FÉ,", "ESPERANÇA E CARIDADE", "PARA QUE NOS", "DESAPEGUEMOS", "DAS COISAS MATERIAIS", "E TERRESTRES", "E TENHAMOS A FORÇA", "PARA VENCER O INIMIGO", "E ASSIM POSSAMOS", "CONTEMPLAR-VOS NA", "GLÓRIA CELESTE. AMÉM." ]
+TEXTO_CREDO_FALLBACK = [ "CREIO EM DEUS PAI TODO PODEROSO,", "CRIADOR DO CÉU E DA TERRA.", "E EM JESUS CRISTO, SEU ÚNICO FILHO,", "NOSSO SENHOR,", "QUE FOI CONCEBIDO PELO PODER DO ESPÍRITO SANTO;", "NASCEU DA VIRGEM MARIA;", "PADECEU SOB PÔNCIO PILATOS,", "FOI CRUCIFICADO, MORTO E SEPULTADO.", "DESCEU À MANSÃO DOS MORTOS;", "RESSUSCITOU AO TERCEIRO DIA;", "SUBIU AOS CÉUS, ESTÁ SENTADO À DIREITA", "DE DEUS PAI TODO-PODEROSO,", "DONDE HÁ DE VIR A JULGAR OS VIVOS E OS MORTOS.", "CREIO NO ESPÍRITO SANTO,", "NA SANTA IGREJA CATÓLICA,", "NA COMUNHÃO DOS SANTOS,", "NA REMISSÃO DOS PECADOS,", "NA RESSURREIÇÃO DA CARNE,", "NA VIDA ETERNA.", "AMÉM." ]
+TEXTO_ORACAO_SANTA_LUZIA_FALLBACK = [ "Ó VIRGEM ADMIRÁVEL.", "CHEIA DE FIRMEZA E DE", "CONSTÂNCIA, QUE NEM", "AS POMPAS HUMANAS", "PUDERAM SEDUZIR,", "NEM AS PROMESSAS,", "NEM AS AMEAÇAS,", "NEM A FORÇA BRUTA", "PUDERAM ABALAR,", "PORQUE SOUBESTES SER", "O TEMPLO VIVO DO", "DIVINO ESPÍRITO SANTO.", "O MUNDO CRISTÃO VOS", "PROCLAMOU ADVOGADA", "DA LUZ DOS NOSSOS", "OLHOS. DEFENDEI-NOS,", "POIS, DE TODA MOLÉSTIA", "QUE POSSA PREJUDICAR", "A NOSSA VISTA.", "ALCANÇAI-NOS A LUZ", "SOBRENATURAL DA FÉ,", "ESPERANÇA E CARIDADE", "PARA QUE NOS", "DESAPEGUEMOS", "DAS COISAS MATERIAIS", "E TERRESTRES", "E TENHAMOS A FORÇA", "PARA VENCER O INIMIGO", "E ASSIM POSSAMOS", "CONTEMPLAR-VOS NA", "GLÓRIA CELESTE. AMÉM." ]
+
+DEFAULT_TEXTS_ORIGINAL = _load_json_resource("default_texts.json", DEFAULT_TEXTS_ORIGINAL_FALLBACK)
+ORACOES_EUCARISTICAS = _load_json_resource("oracoes_eucaristicas.json", ORACOES_EUCARISTICAS_FALLBACK)
+TEXTOS_FIXOS = _load_json_resource(
+    "textos_fixos.json",
+    {"credo": TEXTO_CREDO_FALLBACK, "santa_luzia": TEXTO_ORACAO_SANTA_LUZIA_FALLBACK},
+)
+TEXTO_CREDO = TEXTOS_FIXOS.get("credo", TEXTO_CREDO_FALLBACK)
+TEXTO_ORACAO_SANTA_LUZIA = TEXTOS_FIXOS.get("santa_luzia", TEXTO_ORACAO_SANTA_LUZIA_FALLBACK)
 
 def adiciona_texto_com_divisao(prs, layout, linhas_originais, cor, tamanho_fonte, font_name, bold_state, italic_state, max_linhas, use_auto_size=True):
     if not linhas_originais or all(not s or s.isspace() for s in linhas_originais): return False
@@ -368,28 +402,35 @@ def _wrap_line_to_width(line: str, font_obj, max_width_px: int) -> list:
         wrapped.append(current)
     return wrapped
 
-def _paginate_lines_by_area(lines: list, font_name: str, pt_size: int, area_width_px: int, area_height_px: int, line_spacing: float = 1.15) -> list:
+def _paginate_lines_by_area(lines: list, font_name: str, pt_size: int, area_width_px: int, area_height_px: int, line_spacing: float = 1.15, min_last_lines: int = 1) -> list:
     font_obj = tkfont.Font(family=font_name, size=pt_size, weight='bold')
     line_px = int(font_obj.metrics('linespace') * line_spacing)
     max_lines_per_page = max(1, area_height_px // max(1, line_px))
     wrapped_lines = []
     for original in lines:
         wrapped_lines.extend(_wrap_line_to_width(original, font_obj, area_width_px))
+    while wrapped_lines and wrapped_lines[-1] == '':
+        wrapped_lines.pop()
     pages = []
     while wrapped_lines:
         page = wrapped_lines[:max_lines_per_page]
         pages.append(page)
         wrapped_lines = wrapped_lines[max_lines_per_page:]
+    if len(pages) >= 2 and min_last_lines > 1:
+        last = pages[-1]
+        prev = pages[-2]
+        while len(last) < min_last_lines and len(prev) > min_last_lines:
+            last.insert(0, prev.pop())
     return pages
 
-def adiciona_texto_com_paginacao_inteligente(prs, layout, linhas_originais, cor, tamanho_fonte_pt, font_name, bold_state, italic_state, area_width_px=None, area_height_px=None):
+def adiciona_texto_com_paginacao_inteligente(prs, layout, linhas_originais, cor, tamanho_fonte_pt, font_name, bold_state, italic_state, area_width_px=None, area_height_px=None, min_last_lines=1):
     if not linhas_originais:
         return False
     if area_width_px is None:
         area_width_px = max(300, SLIDE_PX_WIDTH - 2 * CAIXA_MARGIN_PX)
     if area_height_px is None:
         area_height_px = max(200, SLIDE_PX_HEIGHT - 2 * CAIXA_MARGIN_PX)
-    paginas = _paginate_lines_by_area(linhas_originais, font_name, int(tamanho_fonte_pt.pt), area_width_px, area_height_px)
+    paginas = _paginate_lines_by_area(linhas_originais, font_name, int(tamanho_fonte_pt.pt), area_width_px, area_height_px, min_last_lines=min_last_lines)
     if not paginas:
         return False
     conteudo = False
@@ -426,6 +467,7 @@ class MassSlideGeneratorApp:
         elif 'alt' in available_themes: self.style.theme_use('alt')
         
         self._aplicar_estilos_globais()
+        self.fontes_disponiveis = _get_fontes_sistema()
 
         master.title("Slides To My Church v35.2 - UI Clássica / Métodos Completos") 
         master.geometry("1150x950") 
@@ -449,9 +491,9 @@ class MassSlideGeneratorApp:
         manage_sections_frame = ttk.LabelFrame(manage_sections_outer_frame, text="Gerenciar Seções", padding="10")
         manage_sections_frame.pack(fill="x")
         
-        btn_add = ttk.Button(manage_sections_frame, text="Adicionar Nova Seção ", command=self.dialogo_adicionar_secao)
-        btn_add.pack(side="left", padx=(0,8), pady=2)
-        self._adicionar_tooltip(btn_add, "Cria uma nova seção musical personalizada")
+        self.add_button = ttk.Button(manage_sections_frame, text="Adicionar Nova Seção ", command=self.dialogo_adicionar_secao)
+        self.add_button.pack(side="left", padx=(0,8), pady=2)
+        self._adicionar_tooltip(self.add_button, "Cria uma nova seção musical personalizada")
         self.remove_button = ttk.Button(manage_sections_frame, text="Remover Seção", command=self.remover_secao_selecionada, state="disabled")
         self.remove_button.pack(side="left", padx=5, pady=2)
         self._adicionar_tooltip(self.remove_button, "Remove a aba atualmente selecionada")
@@ -468,6 +510,14 @@ class MassSlideGeneratorApp:
         self.config_oracoes_button = ttk.Button(manage_sections_frame, text="Orações Eucarísticas", command=self.configurar_oracoes_eucaristicas_dialog)
         self.config_oracoes_button.pack(side="left", padx=5, pady=2)
         self._adicionar_tooltip(self.config_oracoes_button, "Seleciona e estiliza as Orações Eucarísticas")
+        
+        self.preview_button = ttk.Button(manage_sections_frame, text="Pré-visualizar Seção", command=self.preview_secao_atual)
+        self.preview_button.pack(side="left", padx=5, pady=2)
+        self._adicionar_tooltip(self.preview_button, "Mostra uma prévia da seção selecionada")
+
+        self.generate_button = ttk.Button(manage_sections_frame, text="Gerar PowerPoint", command=self.gerar_apresentacao, style="Accent.TButton")
+        self.generate_button.pack(side="left", padx=5, pady=2)
+        self._adicionar_tooltip(self.generate_button, "Gera o arquivo .pptx com os slides da celebração")
 
         ttk.Separator(master, orient='horizontal').pack(fill='x', padx=12, pady=(4, 6))
 
@@ -475,14 +525,38 @@ class MassSlideGeneratorApp:
         title_outer_frame.pack(fill="x")
         title_frame = ttk.LabelFrame(title_outer_frame, text="Título Inicial da Apresentação", padding="10")
         title_frame.pack(fill="x")
-        self.initial_title_widget = scrolledtext.ScrolledText(title_frame, height=3, width=90, wrap=tk.WORD, font=UI_FONT_BASE); 
+        self.initial_title_widget = scrolledtext.ScrolledText(title_frame, height=3, width=1, wrap=tk.WORD, font=UI_FONT_BASE); 
         self.initial_title_widget.pack(fill="x", expand=True, pady=(2, 0))
         self.initial_title_widget.insert(tk.END, "DOMINGO DA\nQUARESMA")
 
         ttk.Separator(master, orient='horizontal').pack(fill='x', padx=12, pady=(0, 6))
         notebook_frame = ttk.Frame(master, padding=(12,6,12,6)) 
         notebook_frame.pack(expand=True, fill="both")
-        self.notebook = ttk.Notebook(notebook_frame)
+
+        content_pane = ttk.PanedWindow(notebook_frame, orient="horizontal")
+        content_pane.pack(expand=True, fill="both")
+
+        sidebar_frame = ttk.Frame(content_pane, padding=(6,6))
+        main_tabs_frame = ttk.Frame(content_pane)
+        content_pane.add(sidebar_frame, weight=1)
+        content_pane.add(main_tabs_frame, weight=4)
+
+        ttk.Label(sidebar_frame, text="Seções").pack(anchor="w", pady=(0,4))
+        self.section_search_var = tk.StringVar()
+        search_entry = ttk.Entry(sidebar_frame, textvariable=self.section_search_var)
+        search_entry.pack(fill="x", pady=(0,6))
+        self.section_search_var.trace_add("write", self._on_section_search)
+
+        list_container = ttk.Frame(sidebar_frame)
+        list_container.pack(fill="both", expand=True)
+        self.section_listbox = tk.Listbox(list_container, exportselection=False)
+        list_scroll = ttk.Scrollbar(list_container, orient="vertical", command=self.section_listbox.yview)
+        self.section_listbox.config(yscrollcommand=list_scroll.set)
+        self.section_listbox.pack(side="left", fill="both", expand=True)
+        list_scroll.pack(side="right", fill="y")
+        self.section_listbox.bind("<<ListboxSelect>>", self._on_section_list_select)
+
+        self.notebook = ttk.Notebook(main_tabs_frame)
         self.notebook.bind("<<NotebookTabChanged>>", self._atualizar_estado_botoes_controle_abas) 
         self.widgets_gui = {}
         
@@ -504,9 +578,25 @@ class MassSlideGeneratorApp:
         bottom_controls_frame.pack(fill="x", side="bottom")
         self.status_label = ttk.Label(bottom_controls_frame, text="Pronto."); 
         self.status_label.pack(side="left", padx=(0,10), pady=5)
-        self.generate_button = ttk.Button(bottom_controls_frame, text="Gerar PowerPoint", command=self.gerar_apresentacao, style="Accent.TButton"); 
-        self.generate_button.pack(side="right", pady=5)
-        self._adicionar_tooltip(self.generate_button, "Gera o arquivo .pptx com os slides da celebração")
+        self.progress_var = tk.DoubleVar(value=0.0)
+        self.progress = ttk.Progressbar(bottom_controls_frame, mode="determinate", maximum=100, variable=self.progress_var)
+        self.progress.pack(side="right", fill="x", expand=True, padx=(10,0), pady=5)
+        self.progress.stop()
+        self._busy = False
+        self._geracao_state = None
+
+        self._refresh_section_list()
+
+        # Busca inicial silenciosa da liturgia do dia
+        try:
+            self.master.after(300, self.carregar_liturgia_hoje_silencioso)
+        except Exception:
+            pass
+
+        # Estado das Orações Eucarísticas
+        self.eucaristica_selecionar_todas = tk.BooleanVar(value=False)
+        self.eucaristica_escolhidas = set()
+        self.eucaristica_font_size_pt = 90
 
     def _aplicar_estilos_globais(self):
         try:
@@ -551,17 +641,214 @@ class MassSlideGeneratorApp:
         widget.bind("<Enter>", enter)
         widget.bind("<Leave>", leave)
 
-
-        # Busca inicial silenciosa da liturgia do dia
+    def _run_on_ui(self, func):
         try:
-            self.master.after(300, self.carregar_liturgia_hoje_silencioso)
+            self.master.after(0, func)
+        except Exception:
+            func()
+
+    def _show_error_message(self, status_text, title, message):
+        self._set_busy(False, status_text)
+        messagebox.showerror(title, message, parent=self.master)
+
+    def _set_status(self, text):
+        try:
+            self.status_label.config(text=text)
         except Exception:
             pass
 
-        # Estado das Orações Eucarísticas
-        self.eucaristica_selecionar_todas = tk.BooleanVar(value=True)
-        self.eucaristica_escolhidas = set()
-        self.eucaristica_font_size_pt = 90
+    def _set_busy(self, busy, status_text=None, progress_mode="determinate", progress_max=100):
+        self._busy = busy
+        if status_text:
+            self._set_status(status_text)
+        try:
+            self.progress.configure(mode=progress_mode, maximum=progress_max)
+            if busy and progress_mode == "indeterminate":
+                self.progress.start(10)
+            else:
+                self.progress.stop()
+                if not busy:
+                    self.progress_var.set(0)
+        except Exception:
+            pass
+        widgets = [
+            self.add_button,
+            self.remove_button,
+            self.move_up_button,
+            self.move_down_button,
+            self.fetch_liturgia_button,
+            self.config_oracoes_button,
+            self.preview_button,
+            self.generate_button,
+        ]
+        for w in widgets:
+            try:
+                w.config(state="disabled" if busy else "normal")
+            except Exception:
+                pass
+        if not busy:
+            self._atualizar_estado_botoes_controle_abas()
+
+    def _on_section_search(self, *_):
+        self._refresh_section_list()
+
+    def _refresh_section_list(self):
+        try:
+            filtro = (self.section_search_var.get() or "").strip().lower()
+        except Exception:
+            filtro = ""
+        try:
+            self.section_listbox.delete(0, tk.END)
+            tabs = [self.notebook.tab(i, "text") for i in range(self.notebook.index("end"))]
+            for name in tabs:
+                if not filtro or filtro in name.lower():
+                    self.section_listbox.insert(tk.END, name)
+            self._sync_section_list_selection()
+        except Exception:
+            pass
+
+    def _sync_section_list_selection(self):
+        try:
+            selected_tab_id = self.notebook.select()
+            if not selected_tab_id:
+                return
+            selected_name = self.notebook.tab(selected_tab_id, "text")
+            all_items = list(self.section_listbox.get(0, tk.END))
+            if selected_name in all_items:
+                idx = all_items.index(selected_name)
+                self.section_listbox.selection_clear(0, tk.END)
+                self.section_listbox.selection_set(idx)
+                self.section_listbox.see(idx)
+        except Exception:
+            pass
+
+    def _on_section_list_select(self, _event=None):
+        try:
+            selection = self.section_listbox.curselection()
+            if not selection:
+                return
+            name = self.section_listbox.get(selection[0])
+            for i in range(self.notebook.index("end")):
+                if self.notebook.tab(i, "text") == name:
+                    self.notebook.select(i)
+                    break
+        except Exception:
+            pass
+
+    def _build_preview_blocks(self, nome_parte):
+        if nome_parte not in self.widgets_gui:
+            return []
+        data_gui = self.widgets_gui[nome_parte]
+        tipo_secao = data_gui.get("tipo")
+
+        def _get_lines(widget_key):
+            try:
+                raw = data_gui[widget_key].get("1.0", tk.END).strip()
+            except Exception:
+                return []
+            return [l for l in (ln.strip() for ln in raw.split("\n")) if l]
+
+        blocks = []
+        if tipo_secao == "musica":
+            iniciar_refrao = bool(data_gui.get("iniciar_refrao_var") and data_gui["iniciar_refrao_var"].get())
+            refrao = _get_lines("refrao_widget")
+            versos_raw = data_gui.get("verso_widget").get("1.0", tk.END).strip() if "verso_widget" in data_gui else ""
+            estrofes = [b for b in versos_raw.split("\n\n") if b.strip()]
+            versos = []
+            for bloco in estrofes:
+                linhas = [l.strip() for l in bloco.split("\n") if l.strip()]
+                if linhas:
+                    versos.append(linhas)
+            if iniciar_refrao and refrao:
+                tamanho, nome_fonte, bold_state, italic_state = self._get_font_style_from_gui(data_gui, "refrao", DEFAULT_TAMANHO_FONTE_MUSICA_REFRAO, True, False)
+                blocks.append({"text": "\n".join(refrao), "color": UI_COLOR_PRIMARY, "size": tamanho.pt, "bold": bold_state, "italic": italic_state, "font": nome_fonte})
+            elif versos:
+                tamanho, nome_fonte, bold_state, italic_state = self._get_font_style_from_gui(data_gui, "verso", DEFAULT_TAMANHO_FONTE_MUSICA_VERSO, True, False)
+                blocks.append({"text": "\n".join(versos[0]), "color": "white", "size": tamanho.pt, "bold": bold_state, "italic": italic_state, "font": nome_fonte})
+            elif refrao:
+                tamanho, nome_fonte, bold_state, italic_state = self._get_font_style_from_gui(data_gui, "refrao", DEFAULT_TAMANHO_FONTE_MUSICA_REFRAO, True, False)
+                blocks.append({"text": "\n".join(refrao), "color": UI_COLOR_PRIMARY, "size": tamanho.pt, "bold": bold_state, "italic": italic_state, "font": nome_fonte})
+        elif tipo_secao == "leitura":
+            titulo = _get_lines("titulo_amarelo_widget")
+            texto = _get_lines("texto_branco_widget")
+            if titulo:
+                tamanho, nome_fonte, bold_state, italic_state = self._get_font_style_from_gui(data_gui, "titulo_amarelo", DEFAULT_TAMANHO_FONTE_LEITURA_TITULO_AMARELO, True, False)
+                blocks.append({"text": "\n".join(titulo), "color": UI_COLOR_PRIMARY, "size": tamanho.pt, "bold": bold_state, "italic": italic_state, "anchor": "top", "font": nome_fonte})
+            if texto:
+                tamanho, nome_fonte, bold_state, italic_state = self._get_font_style_from_gui(data_gui, "texto_branco", DEFAULT_TAMANHO_FONTE_LEITURA_TEXTO_BRANCO, True, False)
+                blocks.append({"text": "\n".join(texto), "color": "white", "size": tamanho.pt, "bold": bold_state, "italic": italic_state, "anchor": "bottom", "font": nome_fonte})
+        elif tipo_secao == "aclamacao":
+            aclamacao = _get_lines("aclamacao_widget")
+            antifona = _get_lines("antifona_widget")
+            if aclamacao:
+                tamanho, nome_fonte, bold_state, italic_state = self._get_font_style_from_gui(data_gui, "aclamacao", DEFAULT_TAMANHO_FONTE_ACLAMACAO, True, False)
+                blocks.append({"text": "\n".join(aclamacao), "color": UI_COLOR_PRIMARY, "size": tamanho.pt, "bold": bold_state, "italic": italic_state, "anchor": "top", "font": nome_fonte})
+            if antifona:
+                tamanho, nome_fonte, bold_state, italic_state = self._get_font_style_from_gui(data_gui, "antifona", DEFAULT_TAMANHO_FONTE_ANTIFONA, True, False)
+                blocks.append({"text": "\n".join(antifona), "color": "white", "size": tamanho.pt, "bold": bold_state, "italic": italic_state, "anchor": "bottom", "font": nome_fonte})
+        elif tipo_secao == "palavra":
+            texto = _get_lines("texto_widget")
+            if texto:
+                tamanho, nome_fonte, bold_state, italic_state = self._get_font_style_from_gui(data_gui, "texto", DEFAULT_TAMANHO_FONTE_PALAVRA, True, False)
+                blocks.append({"text": "\n".join(texto), "color": UI_COLOR_PRIMARY, "size": tamanho.pt, "bold": bold_state, "italic": italic_state, "font": nome_fonte})
+        return blocks
+
+    def preview_secao_atual(self):
+        try:
+            selected_tab_id = self.notebook.select()
+            if not selected_tab_id:
+                messagebox.showinfo("Pré-visualização", "Selecione uma seção para visualizar.", parent=self.master)
+                return
+            nome_parte = self.notebook.tab(selected_tab_id, "text")
+        except Exception:
+            messagebox.showinfo("Pré-visualização", "Selecione uma seção para visualizar.", parent=self.master)
+            return
+
+        blocks = self._build_preview_blocks(nome_parte)
+        if not blocks:
+            messagebox.showinfo("Pré-visualização", "Nenhum conteúdo para pré-visualizar.", parent=self.master)
+            return
+
+        preview = tk.Toplevel(self.master)
+        preview.title(f"Pré-visualização - {nome_parte}")
+        preview.geometry(f"{SLIDE_PX_WIDTH}x{SLIDE_PX_HEIGHT}")
+        preview.resizable(False, False)
+        canvas = tk.Canvas(preview, bg="black", highlightthickness=0)
+        canvas.pack(fill="both", expand=True)
+
+        def redraw(event=None):
+            canvas.delete("all")
+            w = canvas.winfo_width()
+            h = canvas.winfo_height()
+            for block in blocks:
+                size = max(12, int(block["size"]))
+                font_style = []
+                if block.get("bold"): font_style.append("bold")
+                if block.get("italic"): font_style.append("italic")
+                anchor = block.get("anchor", "center")
+                if anchor == "top":
+                    y = int(h * 0.28)
+                    anchor_tk = "n"
+                elif anchor == "bottom":
+                    y = int(h * 0.68)
+                    anchor_tk = "s"
+                else:
+                    y = int(h * 0.5)
+                    anchor_tk = "center"
+                font_name = block.get("font", NOME_FONTE_PADRAO)
+                canvas.create_text(
+                    w // 2,
+                    y,
+                    text=block["text"],
+                    fill=block["color"],
+                    font=(font_name, size, " ".join(font_style) if font_style else "normal"),
+                    width=int(w * 0.9),
+                    justify="center",
+                    anchor=anchor_tk,
+                )
+
+        canvas.bind("<Configure>", redraw)
+        redraw()
 
 
     def _abrir_dialogo_data(self):
@@ -627,8 +914,14 @@ class MassSlideGeneratorApp:
         if not data_str:
             return
 
-        self.status_label.config(text="Buscando liturgia online...")
+        if getattr(self, "_busy", False):
+            return
 
+        self._set_busy(True, "Buscando liturgia online...", progress_mode="indeterminate")
+        thread = threading.Thread(target=self._fetch_liturgia_worker, args=(data_str,), daemon=True)
+        thread.start()
+
+    def _fetch_liturgia_worker(self, data_str):
         try:
             url = f"{LITURGIA_API_URL}?date={data_str}"
             response = requests.get(url, timeout=15)
@@ -639,17 +932,18 @@ class MassSlideGeneratorApp:
             if not readings:
                 raise ValueError("Nenhum dado de liturgia encontrado.")
 
-            self._preencher_todas_secoes_de_readings(readings)
+            def on_success():
+                self._preencher_todas_secoes_de_readings(readings)
+                self._set_busy(False, f"Liturgia de {data_str} carregada com sucesso!")
+                messagebox.showinfo("Sucesso", f"Liturgia de {data_str} importada. Verifique as seções atualizadas.", parent=self.master)
 
-            self.status_label.config(text=f"Liturgia de {data_str} carregada com sucesso!")
-            messagebox.showinfo("Sucesso", f"Liturgia de {data_str} importada. Verifique as seções atualizadas.", parent=self.master)
-
+            self._run_on_ui(on_success)
         except requests.RequestException as e:
-            self.status_label.config(text="Erro ao buscar online.")
-            messagebox.showerror("Erro de Rede", f"Falha ao conectar à API: {e}", parent=self.master)
+            err = str(e)
+            self._run_on_ui(lambda err=err: self._show_error_message("Erro ao buscar online.", "Erro de Rede", f"Falha ao conectar à API: {err}"))
         except Exception as e:
-            self.status_label.config(text="Erro durante o processamento.")
-            messagebox.showerror("Erro", f"Ocorreu um erro: {e}", parent=self.master)
+            err = str(e)
+            self._run_on_ui(lambda err=err: self._show_error_message("Erro durante o processamento.", "Erro", f"Ocorreu um erro: {err}"))
 
     def _preencher_secao_leitura(self, nome_secao, dados_api):
         if not dados_api:
@@ -750,6 +1044,10 @@ class MassSlideGeneratorApp:
             print(f"Erro ao preencher seções: {e}")
 
     def carregar_liturgia_hoje_silencioso(self):
+        thread = threading.Thread(target=self._carregar_liturgia_hoje_worker, daemon=True)
+        thread.start()
+
+    def _carregar_liturgia_hoje_worker(self):
         try:
             data_str = date.today().strftime("%Y-%m-%d")
             url = f"{LITURGIA_API_URL}?date={data_str}"
@@ -758,10 +1056,9 @@ class MassSlideGeneratorApp:
             data = response.json()
             readings = data.get("today", {}).get("readings", {})
             if readings:
-                self._preencher_todas_secoes_de_readings(readings)
-        except Exception:
-            # Silencioso: não mostrar mensagens
-            pass
+                self._run_on_ui(lambda: self._preencher_todas_secoes_de_readings(readings))
+        except Exception as e:
+            print(f"Aviso: não foi possível carregar a liturgia do dia: {e}")
 
     def _set_texto_leitura_widgets(self, widgets, titulo_amarelo, linhas_texto):
         try:
@@ -911,10 +1208,13 @@ class MassSlideGeneratorApp:
 
     def _atualizar_estado_botoes_controle_abas(self, event=None):
         try:
+            if getattr(self, "_busy", False):
+                return
             if not self.notebook.tabs(): 
                 if hasattr(self, 'remove_button'): self.remove_button.config(state="disabled")
                 if hasattr(self, 'move_up_button'): self.move_up_button.config(state="disabled")
                 if hasattr(self, 'move_down_button'): self.move_down_button.config(state="disabled")
+                if hasattr(self, 'preview_button'): self.preview_button.config(state="disabled")
                 return
 
             selected_tab_id = self.notebook.select()
@@ -922,9 +1222,11 @@ class MassSlideGeneratorApp:
                 if hasattr(self, 'remove_button'): self.remove_button.config(state="normal" if self.notebook.tabs() else "disabled") 
                 if hasattr(self, 'move_up_button'): self.move_up_button.config(state="disabled")
                 if hasattr(self, 'move_down_button'): self.move_down_button.config(state="disabled")
+                if hasattr(self, 'preview_button'): self.preview_button.config(state="disabled")
                 return
 
             if hasattr(self, 'remove_button'): self.remove_button.config(state="normal")
+            if hasattr(self, 'preview_button'): self.preview_button.config(state="normal")
             current_index = self.notebook.index(selected_tab_id)
             total_tabs = self.notebook.index("end")
 
@@ -935,6 +1237,9 @@ class MassSlideGeneratorApp:
             if hasattr(self, 'remove_button'): self.remove_button.config(state="disabled")
             if hasattr(self, 'move_up_button'): self.move_up_button.config(state="disabled")
             if hasattr(self, 'move_down_button'): self.move_down_button.config(state="disabled")
+            if hasattr(self, 'preview_button'): self.preview_button.config(state="disabled")
+        finally:
+            self._sync_section_list_selection()
 
 
     def _reconstruir_ordem_geracao_dinamica(self):
@@ -1005,6 +1310,7 @@ class MassSlideGeneratorApp:
         
         if reconstruir_ordem: self._reconstruir_ordem_geracao_dinamica()
         self._atualizar_estado_botoes_controle_abas() 
+        self._refresh_section_list()
 
     def dialogo_adicionar_secao(self):
         dialog = tk.Toplevel(self.master); dialog.title("Adicionar Nova Seção Musical")
@@ -1056,6 +1362,7 @@ class MassSlideGeneratorApp:
             if tab_name in self.DEFAULT_TEXTS: del self.DEFAULT_TEXTS[tab_name] 
             self._reconstruir_ordem_geracao_dinamica()
             self._atualizar_estado_botoes_controle_abas() 
+            self._refresh_section_list()
             self.status_label.config(text=f"Seção '{tab_name}' removida.")
 
     def mover_secao_selecionada(self, direcao): 
@@ -1071,6 +1378,7 @@ class MassSlideGeneratorApp:
                 self.notebook.select(new_index) 
                 self._reconstruir_ordem_geracao_dinamica()
                 self._atualizar_estado_botoes_controle_abas()
+                self._refresh_section_list()
                 tab_name = self.notebook.tab(new_index, "text")
                 self.status_label.config(text=f"Seção '{tab_name}' movida.")
         except tk.TclError as e:
@@ -1083,8 +1391,9 @@ class MassSlideGeneratorApp:
         controls_left_frame.pack(side="left", fill="x", expand=True, padx=(0,10))
         font_label = ttk.Label(controls_left_frame, text="Fonte:")
         font_label.grid(row=0, column=0, sticky='w', padx=(0, 2), pady=2)
-        font_var = tk.StringVar(value=NOME_FONTE_PADRAO)
-        font_combo = ttk.Combobox(controls_left_frame, textvariable=font_var, values=FONTES_COMUNS_PPT, width=23, state='readonly', style="TCombobox")
+        default_font = NOME_FONTE_PADRAO if NOME_FONTE_PADRAO in self.fontes_disponiveis else (self.fontes_disponiveis[0] if self.fontes_disponiveis else NOME_FONTE_PADRAO)
+        font_var = tk.StringVar(value=default_font)
+        font_combo = ttk.Combobox(controls_left_frame, textvariable=font_var, values=self.fontes_disponiveis, width=23, state='readonly', style="TCombobox")
         font_combo.grid(row=0, column=1, sticky='ew', padx=(0, 10), pady=2)
         data_dict[f"{prefix_key}_font_combo"] = font_combo
         size_label = ttk.Label(controls_left_frame, text="Tam:")
@@ -1102,7 +1411,7 @@ class MassSlideGeneratorApp:
         italic_check.grid(row=1, column=2, columnspan=2, sticky='w', padx=(10,0), pady=2) 
         data_dict[f"{prefix_key}_italic_var"] = italic_var
         controls_left_frame.columnconfigure(1, weight=1) 
-        preview_label = tk.Label(style_frame, text="Amostra", font=(NOME_FONTE_PADRAO, 11), width=12, height=2, relief="groove", borderwidth=1, bg='white') 
+        preview_label = tk.Label(style_frame, text="Amostra", font=(default_font, 11), width=12, height=2, relief="groove", borderwidth=1, bg='white') 
         preview_label.pack(side="right", fill="y", padx=(5,0))
         data_dict[f"{prefix_key}_preview_label"] = preview_label
         def update_preview(*args):
@@ -1113,7 +1422,7 @@ class MassSlideGeneratorApp:
                 fbold = "bold" if bold_var.get() else "normal"; fitalic = "italic" if italic_var.get() else "roman"
                 display_fsize = fsize if fsize < 16 else 16 
                 preview_label.config(font=(fname, display_fsize, fbold, fitalic), text=fname)
-            except (ValueError, tk.TclError): preview_label.config(font=(NOME_FONTE_PADRAO, 11), text="?")
+            except (ValueError, tk.TclError): preview_label.config(font=(default_font, 11), text="?")
         font_var.trace_add("write", update_preview); size_spinbox.config(command=update_preview) 
         bold_var.trace_add("write", update_preview); italic_var.trace_add("write", update_preview)
         update_preview()
@@ -1122,7 +1431,7 @@ class MassSlideGeneratorApp:
         title_config_frame = ttk.Frame(parent_frame); title_config_frame.pack(fill='x', pady=(0,10)) 
         ttk.Label(title_config_frame, text="Título da Seção:", font=('Arial', 10, 'bold')).pack(side='left', anchor='w', padx=(0,5))
         default_titulo_secao = self.DEFAULT_TEXTS.get(nome_parte, {}).get("titulo", nome_parte.upper())
-        data_dict["titulo_secao_entry"] = ttk.Entry(title_config_frame, width=60, font=('Arial', 10))
+        data_dict["titulo_secao_entry"] = ttk.Entry(title_config_frame, width=1, font=('Arial', 10))
         data_dict["titulo_secao_entry"].insert(0, default_titulo_secao)
         data_dict["titulo_secao_entry"].pack(side='left', fill='x', expand=True)
         options_frame = ttk.Frame(parent_frame) 
@@ -1135,6 +1444,8 @@ class MassSlideGeneratorApp:
         data_dict["detectar_refrao_auto_var"] = tk.BooleanVar(value=True)
         chk_detect = ttk.Checkbutton(options_frame, text="Detectar e organizar refrão automaticamente", variable=data_dict["detectar_refrao_auto_var"]) 
         chk_detect.pack(side='left', anchor='w', padx=(15,0))
+        detect_now = ttk.Button(options_frame, text="Detectar agora", command=lambda: self._detectar_e_aplicar_refrao(nome_parte))
+        detect_now.pack(side='left', padx=(10,0))
         # Ao ativar, se já houver texto, processa imediatamente
         def _on_toggle_detect(*_):
             try:
@@ -1148,7 +1459,7 @@ class MassSlideGeneratorApp:
             pass
         refrao_frame = ttk.LabelFrame(parent_frame, text="Refrão (Amarelo)", padding=10); refrao_frame.pack(fill='x', expand=False, pady=5)
         self._criar_controles_estilo(refrao_frame, data_dict, "refrao", DEFAULT_TAMANHO_FONTE_MUSICA_REFRAO, default_bold=True)
-        data_dict["refrao_widget"] = scrolledtext.ScrolledText(refrao_frame, height=6, width=90, wrap=tk.WORD, font=('Arial', 10)); data_dict["refrao_widget"].pack(fill="x", expand=True, padx=0, pady=(5,0))
+        data_dict["refrao_widget"] = scrolledtext.ScrolledText(refrao_frame, height=6, width=1, wrap=tk.WORD, font=('Arial', 10)); data_dict["refrao_widget"].pack(fill="x", expand=True, padx=0, pady=(5,0))
         default_refrao = self.DEFAULT_TEXTS.get(nome_parte, {}).get("refrao", []) 
         if default_refrao: data_dict["refrao_widget"].insert(tk.END, "\n".join(default_refrao))
         # Bind: se usuário colar música inteira no Refrão, reorganiza (mantém só refrão e move versos)
@@ -1167,7 +1478,7 @@ class MassSlideGeneratorApp:
             pass
         verso_frame = ttk.LabelFrame(parent_frame, text="Versos (Branco)", padding=10); verso_frame.pack(fill='both', expand=True, pady=5)
         self._criar_controles_estilo(verso_frame, data_dict, "verso", DEFAULT_TAMANHO_FONTE_MUSICA_VERSO, default_bold=True)
-        data_dict["verso_widget"] = scrolledtext.ScrolledText(verso_frame, height=10, width=90, wrap=tk.WORD, font=('Arial', 10)); data_dict["verso_widget"].pack(fill="both", expand=True, padx=0, pady=(5,0))
+        data_dict["verso_widget"] = scrolledtext.ScrolledText(verso_frame, height=10, width=1, wrap=tk.WORD, font=('Arial', 10)); data_dict["verso_widget"].pack(fill="both", expand=True, padx=0, pady=(5,0))
         default_versos_list_of_lists = self.DEFAULT_TEXTS.get(nome_parte, {}).get("versos", []) 
         default_versos_text = ["\n".join(estrofe) for estrofe in default_versos_list_of_lists]
         if default_versos_text: data_dict["verso_widget"].insert(tk.END, "\n\n".join(default_versos_text))
@@ -1190,11 +1501,11 @@ class MassSlideGeneratorApp:
         titulo_amarelo_padrao_list = self.DEFAULT_TEXTS.get(nome_parte, {}).get("titulo_amarelo", [nome_parte.upper()])
         ref_frame = ttk.LabelFrame(parent_frame, text=f"Título/Referência - {nome_parte} (Amarelo)", padding=10); ref_frame.pack(fill='x', expand=False, pady=5)
         self._criar_controles_estilo(ref_frame, data_dict, "titulo_amarelo", DEFAULT_TAMANHO_FONTE_LEITURA_TITULO_AMARELO, default_bold=True)
-        data_dict["titulo_amarelo_widget"] = scrolledtext.ScrolledText(ref_frame, height=4, width=90, wrap=tk.WORD, font=('Arial', 10)); data_dict["titulo_amarelo_widget"].pack(fill="x", expand=True, padx=0, pady=(5,0))
+        data_dict["titulo_amarelo_widget"] = scrolledtext.ScrolledText(ref_frame, height=4, width=1, wrap=tk.WORD, font=('Arial', 10)); data_dict["titulo_amarelo_widget"].pack(fill="x", expand=True, padx=0, pady=(5,0))
         if titulo_amarelo_padrao_list: data_dict["titulo_amarelo_widget"].insert(tk.END, "\n".join(titulo_amarelo_padrao_list))
         texto_frame = ttk.LabelFrame(parent_frame, text=f"Texto Principal - {nome_parte} (Branco)", padding=10); texto_frame.pack(fill='both', expand=True, pady=5)
         self._criar_controles_estilo(texto_frame, data_dict, "texto_branco", DEFAULT_TAMANHO_FONTE_LEITURA_TEXTO_BRANCO, default_bold=True)
-        data_dict["texto_branco_widget"] = scrolledtext.ScrolledText(texto_frame, height=15, width=90, wrap=tk.WORD, font=('Arial', 10)); data_dict["texto_branco_widget"].pack(fill="both", expand=True, padx=0, pady=(5,0))
+        data_dict["texto_branco_widget"] = scrolledtext.ScrolledText(texto_frame, height=15, width=1, wrap=tk.WORD, font=('Arial', 10)); data_dict["texto_branco_widget"].pack(fill="both", expand=True, padx=0, pady=(5,0))
         default_txt = self.DEFAULT_TEXTS.get(nome_parte, {}).get("texto_branco", [])
         if default_txt: data_dict["texto_branco_widget"].insert(tk.END, "\n".join(default_txt))
 
@@ -1330,7 +1641,7 @@ class MassSlideGeneratorApp:
         title_config_frame = ttk.Frame(parent_frame); title_config_frame.pack(fill='x', pady=(0,5))
         ttk.Label(title_config_frame, text="Título da Seção:", font=('Arial', 10, 'bold')).pack(side='left', anchor='w', padx=(0,5))
         default_titulo_secao = self.DEFAULT_TEXTS.get(nome_parte, {}).get("titulo", nome_parte.upper())
-        data_dict["titulo_secao_entry"] = ttk.Entry(title_config_frame, width=60, font=('Arial', 10))
+        data_dict["titulo_secao_entry"] = ttk.Entry(title_config_frame, width=1, font=('Arial', 10))
         data_dict["titulo_secao_entry"].insert(0, default_titulo_secao)
         data_dict["titulo_secao_entry"].pack(side='left', fill='x', expand=True)
         uppercase_options_frame = ttk.Frame(parent_frame); uppercase_options_frame.pack(fill='x', pady=(0,10)) 
@@ -1339,12 +1650,12 @@ class MassSlideGeneratorApp:
         chk_uppercase.pack(side='left', anchor='w')
         aclamacao_frame = ttk.LabelFrame(parent_frame, text="Aclamação (Amarelo - Superior)", padding=10); aclamacao_frame.pack(fill='x', expand=False, pady=5)
         self._criar_controles_estilo(aclamacao_frame, data_dict, "aclamacao", DEFAULT_TAMANHO_FONTE_ACLAMACAO, default_bold=True)
-        data_dict["aclamacao_widget"] = scrolledtext.ScrolledText(aclamacao_frame, height=5, width=90, wrap=tk.WORD, font=('Arial', 10)); data_dict["aclamacao_widget"].pack(fill="x", expand=True, padx=0, pady=(5,0))
+        data_dict["aclamacao_widget"] = scrolledtext.ScrolledText(aclamacao_frame, height=5, width=1, wrap=tk.WORD, font=('Arial', 10)); data_dict["aclamacao_widget"].pack(fill="x", expand=True, padx=0, pady=(5,0))
         default_aclamacao = self.DEFAULT_TEXTS.get(nome_parte, {}).get("aclamacao_texto", []);
         if default_aclamacao: data_dict["aclamacao_widget"].insert(tk.END, "\n".join(default_aclamacao))
         antifona_frame = ttk.LabelFrame(parent_frame, text="Antífona (Branco - Inferior)", padding=10); antifona_frame.pack(fill='both', expand=True, pady=5)
         self._criar_controles_estilo(antifona_frame, data_dict, "antifona", DEFAULT_TAMANHO_FONTE_ANTIFONA, default_bold=True)
-        data_dict["antifona_widget"] = scrolledtext.ScrolledText(antifona_frame, height=12, width=90, wrap=tk.WORD, font=('Arial', 10)); data_dict["antifona_widget"].pack(fill="both", expand=True, padx=0, pady=(5,0))
+        data_dict["antifona_widget"] = scrolledtext.ScrolledText(antifona_frame, height=12, width=1, wrap=tk.WORD, font=('Arial', 10)); data_dict["antifona_widget"].pack(fill="both", expand=True, padx=0, pady=(5,0))
         default_antifona = self.DEFAULT_TEXTS.get(nome_parte, {}).get("antifona_texto", []);
         if default_antifona: data_dict["antifona_widget"].insert(tk.END, "\n".join(default_antifona))
 
@@ -1352,7 +1663,7 @@ class MassSlideGeneratorApp:
         title_config_frame = ttk.Frame(parent_frame); title_config_frame.pack(fill='x', pady=(0,5))
         ttk.Label(title_config_frame, text="Título da Seção:", font=('Arial', 10, 'bold')).pack(side='left', anchor='w', padx=(0,5))
         default_titulo_secao = self.DEFAULT_TEXTS.get(nome_parte, {}).get("titulo", nome_parte.upper())
-        data_dict["titulo_secao_entry"] = ttk.Entry(title_config_frame, width=60, font=('Arial', 10))
+        data_dict["titulo_secao_entry"] = ttk.Entry(title_config_frame, width=1, font=('Arial', 10))
         data_dict["titulo_secao_entry"].insert(0, default_titulo_secao)
         data_dict["titulo_secao_entry"].pack(side='left', fill='x', expand=True)
         uppercase_options_frame = ttk.Frame(parent_frame); uppercase_options_frame.pack(fill='x', pady=(0,10))
@@ -1361,7 +1672,7 @@ class MassSlideGeneratorApp:
         chk_uppercase.pack(side='left', anchor='w')
         texto_frame = ttk.LabelFrame(parent_frame, text=f"Texto - {nome_parte} (Amarelo)", padding=10); texto_frame.pack(fill='both', expand=True, pady=5)
         self._criar_controles_estilo(texto_frame, data_dict, "texto", DEFAULT_TAMANHO_FONTE_PALAVRA, default_bold=True)
-        data_dict["texto_widget"] = scrolledtext.ScrolledText(texto_frame, height=20, width=90, wrap=tk.WORD, font=('Arial', 10)); data_dict["texto_widget"].pack(fill="both", expand=True, padx=0, pady=(5,0))
+        data_dict["texto_widget"] = scrolledtext.ScrolledText(texto_frame, height=20, width=1, wrap=tk.WORD, font=('Arial', 10)); data_dict["texto_widget"].pack(fill="both", expand=True, padx=0, pady=(5,0))
         default_txt = self.DEFAULT_TEXTS.get(nome_parte, {}).get("texto", [])
         if default_txt: data_dict["texto_widget"].insert(tk.END, "\n".join(default_txt))
 
@@ -1449,16 +1760,19 @@ class MassSlideGeneratorApp:
             pass
 
     def _obter_oracoes_eucaristicas_para_geracao(self):
-        if self.eucaristica_selecionar_todas.get() or not self.eucaristica_escolhidas:
+        if self.eucaristica_selecionar_todas.get():
             return [ORACOES_EUCARISTICAS[n] for n in ORACOES_EUCARISTICAS.keys()]
-        return [ORACOES_EUCARISTICAS[n] for n in ORACOES_EUCARISTICAS.keys() if n in self.eucaristica_escolhidas]
+        elif self.eucaristica_escolhidas:
+            return [ORACOES_EUCARISTICAS[n] for n in ORACOES_EUCARISTICAS.keys() if n in self.eucaristica_escolhidas]
+        return []
 
     def _obter_oracoes_eucaristicas_com_nomes(self):
         # Retorna lista de tuplas (nome, bloco)
-        if self.eucaristica_selecionar_todas.get() or not self.eucaristica_escolhidas:
+        if self.eucaristica_selecionar_todas.get():
             return [(nome, ORACOES_EUCARISTICAS[nome]) for nome in ORACOES_EUCARISTICAS.keys()]
-        else:
+        elif self.eucaristica_escolhidas:
             return [(nome, ORACOES_EUCARISTICAS[nome]) for nome in ORACOES_EUCARISTICAS.keys() if nome in self.eucaristica_escolhidas]
+        return []
 
     def _get_font_style_from_gui(self,data_dict, prefix_key, default_size_pt, default_bold=True, default_italic=False):
         font_size = default_size_pt; font_name = NOME_FONTE_PADRAO; bold_state = default_bold; italic_state = default_italic
@@ -1466,7 +1780,7 @@ class MassSlideGeneratorApp:
         if spinbox:
             try: valor_int = int(spinbox.get()); font_size = Pt(valor_int) if 10 <= valor_int <= 120 else default_size_pt
             except (tk.TclError, ValueError): pass
-        if combo: selected_font = combo.get(); font_name = selected_font if selected_font in FONTES_COMUNS_PPT else NOME_FONTE_PADRAO
+        if combo: selected_font = combo.get(); font_name = selected_font if selected_font in self.fontes_disponiveis else NOME_FONTE_PADRAO
         if bold_var:
             try: bold_state = bold_var.get()
             except tk.TclError: pass
@@ -1555,13 +1869,13 @@ class MassSlideGeneratorApp:
         titulo_adicionado = adiciona_texto_com_divisao(prs, layout_slide_branco, [titulo_parte], COR_TITULO, TAMANHO_TITULO_PARTE, NOME_FONTE_PADRAO, True, False, 5, use_auto_size=False)
         if titulo_adicionado: conteudo_adicionado_total = True
         if iniciar_com_refrao and refrao_final:
-            if adiciona_texto_com_paginacao_inteligente(prs, layout_slide_branco, refrao_final, COR_REFRAO, tamanho_refrao, nome_refrao, bold_refrao, italic_refrao): conteudo_adicionado_total = True 
+            if adiciona_texto_com_paginacao_inteligente(prs, layout_slide_branco, refrao_final, COR_REFRAO, tamanho_refrao, nome_refrao, bold_refrao, italic_refrao, min_last_lines=3): conteudo_adicionado_total = True 
         for estrofe in versos_processados:
-            if adiciona_texto_com_paginacao_inteligente(prs, layout_slide_branco, estrofe, COR_VERSO, tamanho_verso, nome_verso, bold_verso, italic_verso): conteudo_adicionado_total = True 
+            if adiciona_texto_com_paginacao_inteligente(prs, layout_slide_branco, estrofe, COR_VERSO, tamanho_verso, nome_verso, bold_verso, italic_verso, min_last_lines=3): conteudo_adicionado_total = True 
             if refrao_final: 
-                if adiciona_texto_com_paginacao_inteligente(prs, layout_slide_branco, refrao_final, COR_REFRAO, tamanho_refrao, nome_refrao, bold_refrao, italic_refrao): conteudo_adicionado_total = True 
+                if adiciona_texto_com_paginacao_inteligente(prs, layout_slide_branco, refrao_final, COR_REFRAO, tamanho_refrao, nome_refrao, bold_refrao, italic_refrao, min_last_lines=3): conteudo_adicionado_total = True 
         if not versos_processados and refrao_final and not iniciar_com_refrao:
-            if adiciona_texto_com_paginacao_inteligente(prs, layout_slide_branco, refrao_final, COR_REFRAO, tamanho_refrao, nome_refrao, bold_refrao, italic_refrao): conteudo_adicionado_total = True 
+            if adiciona_texto_com_paginacao_inteligente(prs, layout_slide_branco, refrao_final, COR_REFRAO, tamanho_refrao, nome_refrao, bold_refrao, italic_refrao, min_last_lines=3): conteudo_adicionado_total = True 
         return conteudo_adicionado_total
 
     def adicionar_leitura_slide_unico(self, prs, layout_slide_branco, nome_parte_gui):
@@ -1588,8 +1902,8 @@ class MassSlideGeneratorApp:
                 caixa_texto.left=esquerda; caixa_texto.top=topo; caixa_texto.width=largura; caixa_texto.height=altura
             except Exception:
                 pass
-            # Cria páginas do texto em branco
-            adiciona_texto_com_paginacao_inteligente(prs, layout_slide_branco, texto_branco_final, COR_VERSO, tamanho_texto, nome_texto, bold_texto, italic_texto)
+            # Cria páginas do texto em amarelo
+            adiciona_texto_com_paginacao_inteligente(prs, layout_slide_branco, texto_branco_final, COR_TITULO, tamanho_texto, nome_texto, bold_texto, italic_texto)
             return True
         try: caixa_texto.left=esquerda; caixa_texto.top=topo; caixa_texto.width=largura; caixa_texto.height=altura; frame_texto.margin_bottom=Inches(0.05); frame_texto.margin_top=Inches(0.05); frame_texto.margin_left=Inches(0.1); frame_texto.margin_right=Inches(0.1)
         except Exception: pass
@@ -1618,13 +1932,35 @@ class MassSlideGeneratorApp:
         slide = prs.slides.add_slide(layout_slide_branco); conteudo_adicionado = True 
         esquerda=MARGEM_TEXTO; topo=MARGEM_TEXTO; largura=LARGURA_SLIDE-(2*MARGEM_TEXTO); altura=ALTURA_SLIDE-(2*MARGEM_TEXTO)
         caixa_texto = slide.shapes.add_textbox(esquerda,topo,largura,altura); frame_texto=caixa_texto.text_frame; frame_texto.clear(); frame_texto.word_wrap=True; frame_texto.vertical_anchor=MSO_ANCHOR.MIDDLE; frame_texto.auto_size=MSO_AUTO_SIZE.TEXT_TO_FIT_SHAPE
+        # Adiciona todos os elementos em um único slide
         if aclamacao_final:
-            p_ac = frame_texto.add_paragraph(); p_ac.text = " ".join(aclamacao_final); p_ac.alignment = PP_ALIGN.CENTER
-            p_ac.font.name=nome_ac; p_ac.font.size=tamanho_ac; p_ac.font.color.rgb=COR_REFRAO; p_ac.font.bold=bold_ac; p_ac.font.italic=italic_ac
+            # Primeiro o texto de proclamação e aleluia
+            for idx, linha in enumerate(aclamacao_final):
+                p = frame_texto.add_paragraph()
+                p.text = linha
+                p.alignment = PP_ALIGN.CENTER
+                p.font.name = nome_ac
+                p.font.size = tamanho_ac
+                p.font.color.rgb = COR_REFRAO
+                p.font.bold = bold_ac
+                p.font.italic = italic_ac
+                if idx < len(aclamacao_final) - 1:
+                    frame_texto.add_paragraph().text = ""  # Espaço entre linhas
+
         if antifona_final:
-            # Paginar antifona com inteligência
-            adiciona_texto_com_paginacao_inteligente(prs, layout_slide_branco, antifona_final, COR_VERSO, tamanho_an, nome_an, bold_an, italic_an)
-            return True
+            # Adiciona um espaço entre a aclamação e a antífona
+            frame_texto.add_paragraph().text = ""
+            
+            # Adiciona a antífona e versículo
+            for idx, linha in enumerate(antifona_final):
+                p = frame_texto.add_paragraph()
+                p.text = linha
+                p.alignment = PP_ALIGN.CENTER
+                p.font.name = nome_an
+                p.font.size = tamanho_an
+                p.font.color.rgb = COR_VERSO
+                p.font.bold = bold_an
+                p.font.italic = italic_an
         try: caixa_texto.left=esquerda; caixa_texto.top=topo; caixa_texto.width=largura; caixa_texto.height=altura; frame_texto.margin_bottom=Inches(0.05); frame_texto.margin_top=Inches(0.05); frame_texto.margin_left=Inches(0.1); frame_texto.margin_right=Inches(0.1)
         except Exception: pass
         return conteudo_adicionado 
@@ -1677,10 +2013,75 @@ class MassSlideGeneratorApp:
             if adiciona_texto_com_divisao(prs, layout_slide_branco, ["AVISOS"], COR_TITULO, TAMANHO_TITULO_PARTE, NOME_FONTE_PADRAO, True, False, 5, use_auto_size=False): slide_adicionado = True
         return slide_adicionado
 
+    def _processar_secao_geracao(self, prs, layout_slide_branco, nome_parte):
+        conteudo_desta_secao_adicionado = False
+        if nome_parte == "TITULO_INICIAL_PLACEHOLDER":
+            initial_title_str = self.initial_title_widget.get("1.0", tk.END).strip()
+            initial_title_lines = [l.strip() for l in initial_title_str.split('\n') if l.strip()]
+            if initial_title_lines:
+                if adiciona_texto_com_divisao(prs, layout_slide_branco, initial_title_lines, COR_TITULO, TAMANHO_FONTE_TITULO_INICIAL, NOME_FONTE_PADRAO, True, False, 5, use_auto_size=True):
+                    conteudo_desta_secao_adicionado = True
+        elif nome_parte == "CREDO":
+            if self.adicionar_secao_fixa(prs, layout_slide_branco, "ORAÇÃO DO CREDO", TEXTO_CREDO, Pt(90), 3, use_auto_size_content=True):
+                conteudo_desta_secao_adicionado = True
+        elif nome_parte == "PRECES":
+            if self.adicionar_secao_fixa(prs, layout_slide_branco, "PRECES", [], Pt(1), 1):
+                conteudo_desta_secao_adicionado = True
+        elif nome_parte == "SANTO_TITULO":
+            if self.adicionar_secao_fixa(prs, layout_slide_branco, "SANTO", [], Pt(1), 1):
+                conteudo_desta_secao_adicionado = True
+        elif nome_parte == "ORACAO_EUCARISTICA":
+            if self.adicionar_secao_fixa(prs, layout_slide_branco, "ORAÇÃO EUCARÍSTICA", [], Pt(1), 2):
+                conteudo_desta_secao_adicionado = True
+            if self.eucaristica_selecionar_todas.get():
+                for nome, bloco in self._obter_oracoes_eucaristicas_com_nomes():
+                    titulo_ok = self.adicionar_secao_fixa(prs, layout_slide_branco, nome.upper(), [], Pt(1), 1)
+                    conteudo_desta_secao_adicionado = conteudo_desta_secao_adicionado or titulo_ok
+                    linhas = [(linha or "").upper() for linha in bloco]
+                    if linhas:
+                        if self.adicionar_secao_fixa(prs, layout_slide_branco, "", linhas, Pt(self.eucaristica_font_size_pt), 1, cor=COR_REFRAO, use_auto_size_content=True):
+                            conteudo_desta_secao_adicionado = True
+            else:
+                conteudo_oracoes = self._obter_oracoes_eucaristicas_para_geracao()
+                if conteudo_oracoes:
+                    linhas = []
+                    for bloco in conteudo_oracoes:
+                        for linha in bloco:
+                            linhas.append((linha or "").upper())
+                        linhas.append("")
+                    while linhas and linhas[-1] == "":
+                        linhas.pop()
+                    if self.adicionar_secao_fixa(prs, layout_slide_branco, "", linhas, Pt(self.eucaristica_font_size_pt), 1, cor=COR_REFRAO, use_auto_size_content=True):
+                        conteudo_desta_secao_adicionado = True
+        elif nome_parte == "CORDEIRO_TITULO":
+            if self.adicionar_secao_fixa(prs, layout_slide_branco, "CORDEIRO", [], Pt(1), 1):
+                conteudo_desta_secao_adicionado = True
+        elif nome_parte == "SANTA_LUZIA":
+            if self.adicionar_secao_fixa(prs, layout_slide_branco, "ORAÇÃO A SANTA LUZIA", TEXTO_ORACAO_SANTA_LUZIA, Pt(90), 4, use_auto_size_content=True):
+                conteudo_desta_secao_adicionado = True
+        elif nome_parte == "AVISOS_IMG":
+            if self.adicionar_aviso_com_imagem(prs, layout_slide_branco, "AVISOS.png"):
+                conteudo_desta_secao_adicionado = True
+        elif nome_parte in self.widgets_gui:
+            data_gui = self.widgets_gui[nome_parte]
+            tipo_secao = data_gui.get("tipo")
+            if tipo_secao == "musica":
+                if self.adicionar_secao_musical(prs, layout_slide_branco, nome_parte): conteudo_desta_secao_adicionado = True
+            elif tipo_secao == "leitura":
+                if self.adicionar_leitura_slide_unico(prs, layout_slide_branco, nome_parte): conteudo_desta_secao_adicionado = True
+            elif tipo_secao == "aclamacao":
+                if self.adicionar_aclamacao_slide_unico(prs, layout_slide_branco, nome_parte): conteudo_desta_secao_adicionado = True
+            elif tipo_secao == "palavra":
+                if self.adicionar_secao_palavra(prs, layout_slide_branco, nome_parte): conteudo_desta_secao_adicionado = True
+        return conteudo_desta_secao_adicionado
+
     def gerar_apresentacao(self):
-        self.status_label.config(text="Gerando apresentação...")
-        self.master.update_idletasks()
-        self._reconstruir_ordem_geracao_dinamica() 
+        if getattr(self, "_busy", False):
+            return
+        self._reconstruir_ordem_geracao_dinamica()
+        total = max(1, len(self.ordem_geracao_dinamica))
+        self._set_busy(True, "Gerando apresentação...", progress_mode="determinate", progress_max=total)
+        self.progress_var.set(0)
 
         try:
             prs = Presentation()
@@ -1688,129 +2089,114 @@ class MassSlideGeneratorApp:
             try:
                 fill = prs.slide_masters[0].background.fill
                 fill.solid(); fill.fore_color.rgb = COR_FUNDO_PRETO
-            except Exception as e_bg_master: print(f"Aviso: Não foi possível aplicar fundo preto no master: {e_bg_master}")
+            except Exception as e_bg_master:
+                print(f"Aviso: Não foi possível aplicar fundo preto no master: {e_bg_master}")
 
             layout_slide_branco = next((l for l in prs.slide_layouts if "Branco" in l.name or "Blank" in l.name), None)
-            if not layout_slide_branco: 
+            if not layout_slide_branco:
                 idx_fallback = 5 if len(prs.slide_layouts) > 5 else (len(prs.slide_layouts) -1 if len(prs.slide_layouts) > 0 else 0)
-                if len(prs.slide_layouts) > 0: layout_slide_branco = prs.slide_layouts[idx_fallback]
-                else: 
+                if len(prs.slide_layouts) > 0:
+                    layout_slide_branco = prs.slide_layouts[idx_fallback]
+                else:
                     sl = prs.slide_masters[0].slide_layouts.add_layout("Branco Personalizado", prs.slide_masters[0])
                     layout_slide_branco = sl
-            
-            slides_adicionados_conteudo_geral = 0 
-            
-            for i, nome_parte in enumerate(self.ordem_geracao_dinamica):
-                conteudo_desta_secao_adicionado = False 
-                
-                if nome_parte == "TITULO_INICIAL_PLACEHOLDER":
-                    initial_title_str = self.initial_title_widget.get("1.0", tk.END).strip()
-                    initial_title_lines = [l.strip() for l in initial_title_str.split('\n') if l.strip()]
-                    if initial_title_lines:
-                        if adiciona_texto_com_divisao(prs, layout_slide_branco, initial_title_lines, COR_TITULO, TAMANHO_FONTE_TITULO_INICIAL, NOME_FONTE_PADRAO, True, False, 5, use_auto_size=True):
-                            conteudo_desta_secao_adicionado = True
-                elif nome_parte == "CREDO":
-                    if self.adicionar_secao_fixa(prs, layout_slide_branco, "ORAÇÃO DO CREDO", TEXTO_CREDO, Pt(90), 3, use_auto_size_content=True):
-                        conteudo_desta_secao_adicionado = True
-                elif nome_parte == "PRECES":
-                    if self.adicionar_secao_fixa(prs, layout_slide_branco, "PRECES", [], Pt(1), 1): 
-                        conteudo_desta_secao_adicionado = True
-                elif nome_parte == "SANTO_TITULO":
-                    if self.adicionar_secao_fixa(prs, layout_slide_branco, "SANTO", [], Pt(1),1):
-                        conteudo_desta_secao_adicionado = True
-                elif nome_parte == "ORACAO_EUCARISTICA":
-                    if self.adicionar_secao_fixa(prs, layout_slide_branco, "ORAÇÃO EUCARÍSTICA", [], Pt(1), 2):
-                        conteudo_desta_secao_adicionado = True
-                    # Se "Selecionar todas" estiver ativo, inserir um slide-título com o nome de cada oração antes do seu conteúdo
-                    if self.eucaristica_selecionar_todas.get():
-                        for nome, bloco in self._obter_oracoes_eucaristicas_com_nomes():
-                            titulo_ok = self.adicionar_secao_fixa(prs, layout_slide_branco, nome.upper(), [], Pt(1), 1)
-                            conteudo_desta_secao_adicionado = conteudo_desta_secao_adicionado or titulo_ok
-                            linhas = [(linha or "").upper() for linha in bloco]
-                            if linhas:
-                                if self.adicionar_secao_fixa(prs, layout_slide_branco, "", linhas, Pt(self.eucaristica_font_size_pt), 1, cor=COR_REFRAO, use_auto_size_content=True):
-                                    conteudo_desta_secao_adicionado = True
-                    else:
-                        conteudo_oracoes = self._obter_oracoes_eucaristicas_para_geracao()
-                        if conteudo_oracoes:
-                            linhas = []
-                            for bloco in conteudo_oracoes:
-                                for linha in bloco:
-                                    linhas.append((linha or "").upper())
-                                # separador entre orações diferentes (não cria slide vazio, só força quebra posterior)
-                                linhas.append("")
-                            while linhas and linhas[-1] == "":
-                                linhas.pop()
-                            # Texto em amarelo e 1 linha por slide
-                            if self.adicionar_secao_fixa(prs, layout_slide_branco, "", linhas, Pt(self.eucaristica_font_size_pt), 1, cor=COR_REFRAO, use_auto_size_content=True):
-                                conteudo_desta_secao_adicionado = True
-    
-                elif nome_parte == "CORDEIRO_TITULO":
-                    if self.adicionar_secao_fixa(prs, layout_slide_branco, "CORDEIRO", [], Pt(1), 1):
-                        conteudo_desta_secao_adicionado = True
-                elif nome_parte == "SANTA_LUZIA":
-                    if self.adicionar_secao_fixa(prs, layout_slide_branco, "ORAÇÃO A SANTA LUZIA", TEXTO_ORACAO_SANTA_LUZIA, Pt(90), 4, use_auto_size_content=True):
-                         conteudo_desta_secao_adicionado = True
-                elif nome_parte == "AVISOS_IMG": 
-                    if self.adicionar_aviso_com_imagem(prs, layout_slide_branco, "AVISOS.png"):
-                         conteudo_desta_secao_adicionado = True
-                elif nome_parte in self.widgets_gui: 
-                    data_gui = self.widgets_gui[nome_parte]
-                    tipo_secao = data_gui.get("tipo")
-                    if tipo_secao == "musica":
-                        if self.adicionar_secao_musical(prs, layout_slide_branco, nome_parte): conteudo_desta_secao_adicionado = True
-                    elif tipo_secao == "leitura":
-                        if self.adicionar_leitura_slide_unico(prs, layout_slide_branco, nome_parte): conteudo_desta_secao_adicionado = True
-                    elif tipo_secao == "aclamacao":
-                        if self.adicionar_aclamacao_slide_unico(prs, layout_slide_branco, nome_parte): conteudo_desta_secao_adicionado = True
-                    elif tipo_secao == "palavra":
-                        if self.adicionar_secao_palavra(prs, layout_slide_branco, nome_parte): conteudo_desta_secao_adicionado = True
-                
-                if conteudo_desta_secao_adicionado:
-                    slides_adicionados_conteudo_geral += 1
-                    is_last_item_real_na_apresentacao = (nome_parte == "AVISOS_IMG") 
-                    
-                    if not is_last_item_real_na_apresentacao:
-                        if len(prs.slides) > 0: 
-                            last_slide_is_separator = not prs.slides[-1].shapes and not prs.slides[-1].placeholders
-                            if not last_slide_is_separator:
-                                prs.slides.add_slide(layout_slide_branco)
-                        elif slides_adicionados_conteudo_geral > 0 : 
-                             prs.slides.add_slide(layout_slide_branco)
-            
+
+            self._geracao_state = {
+                "prs": prs,
+                "layout": layout_slide_branco,
+                "index": 0,
+                "total": len(self.ordem_geracao_dinamica),
+                "slides_adicionados": 0,
+                "ultimo_nome_parte": None,
+            }
+            self.master.after(1, self._gerar_passo)
+        except Exception as e:
+            import traceback; traceback.print_exc()
+            self._set_busy(False, "Erro durante a geração!")
+            messagebox.showerror("Erro", f"Ocorreu um erro:\n{e}", parent=self.master)
+
+    def _gerar_passo(self):
+        state = self._geracao_state
+        if not state:
+            self._set_busy(False, "Geração cancelada.")
+            return
+        if state["index"] >= state["total"]:
+            self._finalizar_geracao()
+            return
+
+        nome_parte = self.ordem_geracao_dinamica[state["index"]]
+        try:
+            conteudo_adicionado = self._processar_secao_geracao(state["prs"], state["layout"], nome_parte)
+            if conteudo_adicionado:
+                state["slides_adicionados"] += 1
+                is_last_item_real_na_apresentacao = (nome_parte == "AVISOS_IMG")
+                if not is_last_item_real_na_apresentacao:
+                    if len(state["prs"].slides) > 0:
+                        last_slide_is_separator = not state["prs"].slides[-1].shapes and not state["prs"].slides[-1].placeholders
+                        if not last_slide_is_separator:
+                            state["prs"].slides.add_slide(state["layout"])
+                    elif state["slides_adicionados"] > 0:
+                        state["prs"].slides.add_slide(state["layout"])
+            state["ultimo_nome_parte"] = nome_parte
+        except Exception as e:
+            self._falha_geracao(e)
+            return
+
+        state["index"] += 1
+        self.progress_var.set(state["index"])
+        self._set_status(f"Gerando... ({state['index']}/{max(1, state['total'])})")
+        self.master.after(1, self._gerar_passo)
+
+    def _falha_geracao(self, erro):
+        import traceback; traceback.print_exc()
+        self._set_busy(False, "Erro durante a geração!")
+        self._geracao_state = None
+        messagebox.showerror("Erro", f"Ocorreu um erro:\n{erro}", parent=self.master)
+
+    def _finalizar_geracao(self):
+        state = self._geracao_state
+        if not state:
+            self._set_busy(False, "Geração cancelada.")
+            return
+        prs = state["prs"]
+        slides_adicionados_conteudo_geral = state["slides_adicionados"]
+        ultimo_nome_parte = state["ultimo_nome_parte"]
+
+        try:
             if slides_adicionados_conteudo_geral > 0 and len(prs.slides) > 0:
-                if not (len(prs.slides) == 1 and self.initial_title_widget.get("1.0", tk.END).strip() and slides_adicionados_conteudo_geral == 1) :
+                if not (len(prs.slides) == 1 and self.initial_title_widget.get("1.0", tk.END).strip() and slides_adicionados_conteudo_geral == 1):
                     last_slide = prs.slides[-1]
                     if not last_slide.shapes and not last_slide.placeholders and \
-                       (not self.ordem_geracao_dinamica or self.ordem_geracao_dinamica[-1] != "AVISOS_IMG" or nome_parte != "AVISOS_IMG"): 
-                         xml_slides = prs.slides._sldIdLst; slides = list(xml_slides)
-                         if slides: xml_slides.remove(slides[-1])
+                       (not self.ordem_geracao_dinamica or self.ordem_geracao_dinamica[-1] != "AVISOS_IMG" or ultimo_nome_parte != "AVISOS_IMG"):
+                        xml_slides = prs.slides._sldIdLst; slides = list(xml_slides)
+                        if slides: xml_slides.remove(slides[-1])
 
             if slides_adicionados_conteudo_geral == 0 and not (self.initial_title_widget.get("1.0", tk.END).strip()):
                 if len(prs.slides) > 0: prs.slides._sldIdLst.clear()
 
-            if not prs.slides: 
+            if not prs.slides:
                 messagebox.showwarning("Atenção", "Nenhum conteúdo resultou em slides. O arquivo não será salvo.", parent=self.master)
-                self.status_label.config(text="Geração cancelada (vazia).")
+                self._set_busy(False, "Geração cancelada (vazia).")
+                self._geracao_state = None
                 return
 
             filepath = filedialog.asksaveasfilename(defaultextension=".pptx", filetypes=[("PowerPoint Presentations", "*.pptx")], initialfile="Missa_Gerada_v35_2.pptx", parent=self.master)
-            if not filepath: self.status_label.config(text="Geração cancelada."); return
+            if not filepath:
+                self._set_busy(False, "Geração cancelada.")
+                self._geracao_state = None
+                return
             prs.save(filepath)
-            self.status_label.config(text=f"Salvo: {os.path.basename(filepath)}")
-            messagebox.showinfo("Sucesso", f"Apresentação '{os.path.basename(filepath)}' gerada e salva!", parent=self.master)
+            total_slides = len(prs.slides)
+            self._set_busy(False, f"Salvo: {os.path.basename(filepath)}")
+            messagebox.showinfo("Sucesso", f"Apresentação '{os.path.basename(filepath)}' gerada e salva! Total de slides: {total_slides}.", parent=self.master)
             try:
                 if platform.system() == 'Darwin': subprocess.call(('open', filepath))
                 elif platform.system() == 'Windows': os.startfile(filepath)
                 else: subprocess.call(('xdg-open', filepath))
-            except Exception as e_open: print(f"Erro ao abrir o arquivo: {e_open}")
-
-        except Exception as e:
-            self.status_label.config(text="Erro durante a geração!")
-            import traceback; traceback.print_exc()
-            messagebox.showerror("Erro", f"Ocorreu um erro:\n{e}", parent=self.master)
+            except Exception as e_open:
+                print(f"Erro ao abrir o arquivo: {e_open}")
         finally:
-            self.master.update_idletasks()
+            self._geracao_state = None
 
 if __name__ == "__main__":
     root = tk.Tk() # Revertido para tk.Tk()

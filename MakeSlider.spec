@@ -1,11 +1,10 @@
-# -*- mode: python ; coding: utf-8 -*-
-
+import sys
 
 a = Analysis(
     ['MakeSlider.py'],
     pathex=[],
     binaries=[],
-    datas=[('AVISOS.png', '.')],
+    datas=[('AVISOS.png', '.'), ('resources', 'resources'), ('icone.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -19,16 +18,14 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
+    [] if getattr(sys, 'frozen', False) else a.binaries,
+    a.zipfiles,
     a.datas,
-    [],
     name='MakeSlider',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,

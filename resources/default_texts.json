@@ -1,0 +1,73 @@
+{
+  "Entrada": {
+    "titulo": "CANTO DE ENTRADA",
+    "refrao": [],
+    "versos": []
+  },
+  "Ato Penitencial": {
+    "titulo": "ATO PENITENCIAL",
+    "refrao": [],
+    "versos": []
+  },
+  "Glória": {
+    "titulo": "GLÓRIA",
+    "refrao": [],
+    "versos": []
+  },
+  "Palavra": {
+    "titulo": "PALAVRA",
+    "texto": [
+      "DESÇA COMO A CHUVA A TUA",
+      "PALAVRA. QUE SE ESPALHE",
+      "COMO ORVALHO. COMO",
+      "CHUVISCO NA RELVA. COMO",
+      "AGUACEIRO NA GRAMA.",
+      "AMÉM!"
+    ]
+  },
+  "1ª Leitura": {
+    "titulo_amarelo": [
+      "PRIMEIRA LEITURA"
+    ],
+    "texto_branco": [
+      "Isaias 55,10-11"
+    ]
+  },
+  "Salmo": {
+    "titulo_amarelo": [
+      "SALMO 64 (65)"
+    ],
+    "texto_branco": [
+      "- A semente caiu em terra boa e deu fruto."
+    ]
+  },
+  "2ª Leitura": {
+    "titulo_amarelo": [
+      "SEGUNDA LEITURA"
+    ],
+    "texto_branco": [
+      "Romanos 8,18-23"
+    ]
+  },
+  "Aclamação": {
+    "titulo": "ACLAMAÇÃO DO EVANGELHO",
+    "aclamacao_texto": [
+      "Aleluia, Aleluia, Aleluia!"
+    ],
+    "antifona_texto": [
+      "Tua Palavra é a luz do caminho",
+      "A lâmpada para os meus pés, Senhor!",
+      "(Mt 13,1-23)"
+    ]
+  },
+  "Oferendas": {
+    "titulo": "PREPARAÇÃO DAS OFERENDAS",
+    "refrao": [],
+    "versos": []
+  },
+  "Comunhão": {
+    "titulo": "COMUNHÃO",
+    "refrao": [],
+    "versos": []
+  }
+}
