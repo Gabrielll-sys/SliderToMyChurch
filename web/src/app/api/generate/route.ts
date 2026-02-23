@@ -370,6 +370,28 @@ function textHas(value: string, fragment: string): boolean {
   return value.toLowerCase().includes(fragment.toLowerCase());
 }
 
+function normalizeSectionLabel(value: string | null | undefined): string {
+  if (!value) {
+    return "";
+  }
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/ª/g, "a")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function isSecondReadingSection(section: SectionState): boolean {
+  const labels = [
+    normalizeSectionLabel(section.canonicalId),
+    normalizeSectionLabel(section.name),
+    normalizeSectionLabel(section.title),
+  ];
+  return labels.some((label) => label === "2a leitura" || label === "segunda leitura");
+}
+
 function isAcclamationAnchor(section: SectionState): boolean {
   if (section.type === "aclamacao") {
     return true;
@@ -695,6 +717,11 @@ export async function POST(request: Request) {
       }
 
       if (section.type === "leitura") {
+        const hasWhiteText = section.whiteTextLines.some((line) => line.trim().length > 0);
+        if (isSecondReadingSection(section) && !hasWhiteText) {
+          continue;
+        }
+
         const leituraTitle =
           section.yellowTitleLines.length > 0
             ? section.yellowTitleLines
