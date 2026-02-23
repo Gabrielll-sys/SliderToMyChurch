@@ -80,6 +80,10 @@ const EDITOR_SPECS: Record<SectionType, EditorSpec[]> = {
   palavra: [{ field: "wordLines", label: "Palavra", styleKey: "word" }],
 };
 
+function isMusicBlockField(field: LineField): field is "refrainLines" | "verseLines" {
+  return field === "refrainLines" || field === "verseLines";
+}
+
 function formatTodayISO(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -240,6 +244,137 @@ function StyleEditor({
   );
 }
 
+type SectionEditorCardProps = {
+  id: string;
+  index: number;
+  section: SectionState;
+  onMove: (id: string, delta: -1 | 1) => void;
+  onDetectRefrain: (id: string) => void;
+  onDelete: (id: string) => void;
+  onUpdateTitle: (id: string, value: string) => void;
+  onToggleStartWithRefrain: (id: string) => void;
+  onToggleAutoDetectRefrain: (id: string) => void;
+  onUpdateLines: (id: string, field: LineField, value: string) => void;
+  onScheduleAutoDetectRefrain: (id: string) => void;
+  onUpdateStyle: (id: string, key: StyleKey, patch: Partial<TextStyle>) => void;
+};
+
+function SectionEditorCard({
+  id,
+  index,
+  section,
+  onMove,
+  onDetectRefrain,
+  onDelete,
+  onUpdateTitle,
+  onToggleStartWithRefrain,
+  onToggleAutoDetectRefrain,
+  onUpdateLines,
+  onScheduleAutoDetectRefrain,
+  onUpdateStyle,
+}: SectionEditorCardProps) {
+  return (
+    <details open={index === 0} className="rounded-xl border border-stone-200 bg-white">
+      <summary className="flex cursor-pointer justify-between px-4 py-2 text-sm font-semibold">
+        <span>
+          {(section.title || section.name)} ({section.type})
+        </span>
+        <span>{">"}</span>
+      </summary>
+
+      <div className="space-y-3 border-t border-stone-200 p-4">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => onMove(id, -1)}
+            className="rounded border border-stone-300 px-2 py-1 text-xs"
+          >
+            Mover Seção Para Cima
+          </button>
+          <button
+            onClick={() => onMove(id, 1)}
+            className="rounded border border-stone-300 px-2 py-1 text-xs"
+          >
+            Mover Seção Para Baixo
+          </button>
+          {section.type === "musica" && (
+            <button
+              onClick={() => onDetectRefrain(id)}
+              className="rounded border border-amber-300 px-2 py-1 text-xs"
+            >
+              Detectar refrao
+            </button>
+          )}
+          <button
+            onClick={() => onDelete(id)}
+            className="rounded border border-red-300 px-2 py-1 text-xs"
+          >
+            Excluir secao
+          </button>
+        </div>
+
+        <input
+          value={section.title}
+          onChange={(event) => onUpdateTitle(id, event.target.value)}
+          className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+        />
+
+        {section.type === "musica" && (
+          <div className="flex flex-wrap gap-3">
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={section.startWithRefrain}
+                onChange={() => onToggleStartWithRefrain(id)}
+              />
+              Iniciar com refrao
+            </label>
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={section.autoDetectRefrain}
+                onChange={() => onToggleAutoDetectRefrain(id)}
+              />
+              Detectar e reorganizar refrao automaticamente ao colar
+            </label>
+          </div>
+        )}
+
+        <StyleEditor
+          style={section.styles.title}
+          onPatch={(patch) => onUpdateStyle(id, "title", patch)}
+        />
+
+        {EDITOR_SPECS[section.type].map((spec) => {
+          const isMusicField = section.type === "musica" && isMusicBlockField(spec.field);
+          const value = isMusicField
+            ? joinTextareaBlocks(section[spec.field] as string[])
+            : joinTextarea(section[spec.field] as string[]);
+
+          return (
+            <div key={spec.field} className="space-y-1">
+              <p className="text-xs font-semibold">{spec.label}</p>
+              <textarea
+                value={value}
+                onChange={(event) => onUpdateLines(id, spec.field, event.target.value)}
+                onPaste={() => {
+                  if (isMusicField) {
+                    onScheduleAutoDetectRefrain(id);
+                  }
+                }}
+                className="min-h-32 w-full rounded border border-stone-300 p-2 text-sm"
+              />
+              <StyleEditor
+                style={section.styles[spec.styleKey]}
+                onPatch={(patch) => onUpdateStyle(id, spec.styleKey, patch)}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
 export default function Home() {
   const initialLiturgiaDate = useMemo(() => formatTodayISO(), []);
   const [sections, setSections] = useState<SectionsState>(() => buildInitialSections());
@@ -295,7 +430,7 @@ export default function Home() {
     updateSection(id, (section) => ({
       ...section,
       [field]:
-        section.type === "musica" && (field === "refrainLines" || field === "verseLines")
+        section.type === "musica" && isMusicBlockField(field)
           ? splitTextareaBlocksForEditing(value)
           : splitTextareaForEditing(value),
     }));
@@ -548,6 +683,28 @@ export default function Home() {
     setOptions((current) => ({ ...current, [key]: !(current[key] as boolean) }));
   };
 
+  const moveSection = (id: string, delta: -1 | 1) => {
+    setSectionOrder((current) => moveItem(current, id, delta));
+  };
+
+  const updateSectionTitle = (id: string, value: string) => {
+    updateSection(id, (current) => ({ ...current, title: value }));
+  };
+
+  const toggleStartWithRefrain = (id: string) => {
+    updateSection(id, (current) => ({
+      ...current,
+      startWithRefrain: !current.startWithRefrain,
+    }));
+  };
+
+  const toggleAutoDetectRefrain = (id: string) => {
+    updateSection(id, (current) => ({
+      ...current,
+      autoDetectRefrain: !current.autoDetectRefrain,
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#f5f0d3_0%,#f4f7fb_45%,#eef1f7_100%)] p-4 md:p-8">
       <main className="mx-auto flex max-w-6xl flex-col gap-4">
@@ -646,117 +803,21 @@ export default function Home() {
           }
 
           return (
-            <details key={id} open={index === 0} className="rounded-xl border border-stone-200 bg-white">
-              <summary className="flex cursor-pointer justify-between px-4 py-2 text-sm font-semibold">
-                <span>
-                  {(section.title || section.name)} ({section.type})
-                </span>
-                <span>{">"}</span>
-              </summary>
-
-              <div className="space-y-3 border-t border-stone-200 p-4">
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => setSectionOrder((current) => moveItem(current, id, -1))}
-                    className="rounded border border-stone-300 px-2 py-1 text-xs"
-                  >
-                    Mover Seção Para Cima
-                  </button>
-                  <button
-                    onClick={() => setSectionOrder((current) => moveItem(current, id, 1))}
-                    className="rounded border border-stone-300 px-2 py-1 text-xs"
-                  >
-                    Mover Seção Para Baixo
-                  </button>
-                  {section.type === "musica" && (
-                    <button
-                      onClick={() => detectRefrain(id)}
-                      className="rounded border border-amber-300 px-2 py-1 text-xs"
-                    >
-                      Detectar refrao
-                    </button>
-                  )}
-                  <button
-                    onClick={() => removeSection(id)}
-                    className="rounded border border-red-300 px-2 py-1 text-xs"
-                  >
-                    Excluir secao
-                  </button>
-                </div>
-
-                <input
-                  value={section.title}
-                  onChange={(event) =>
-                    updateSection(id, (current) => ({ ...current, title: event.target.value }))
-                  }
-                  className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
-                />
-
-                {section.type === "musica" && (
-                  <div className="flex flex-wrap gap-3">
-                    <label className="flex items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={section.startWithRefrain}
-                        onChange={() =>
-                          updateSection(id, (current) => ({
-                            ...current,
-                            startWithRefrain: !current.startWithRefrain,
-                          }))
-                        }
-                      />
-                      Iniciar com refrao
-                    </label>
-                    <label className="flex items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={section.autoDetectRefrain}
-                        onChange={() =>
-                          updateSection(id, (current) => ({
-                            ...current,
-                            autoDetectRefrain: !current.autoDetectRefrain,
-                          }))
-                        }
-                      />
-                      Detectar e reorganizar refrao automaticamente ao colar
-                    </label>
-                  </div>
-                )}
-
-                <StyleEditor
-                  style={section.styles.title}
-                  onPatch={(patch) => updateStyle(id, "title", patch)}
-                />
-
-                {EDITOR_SPECS[section.type].map((spec) => (
-                  <div key={spec.field} className="space-y-1">
-                    <p className="text-xs font-semibold">{spec.label}</p>
-                    <textarea
-                      value={
-                        section.type === "musica" &&
-                        (spec.field === "refrainLines" || spec.field === "verseLines")
-                          ? joinTextareaBlocks(section[spec.field] as string[])
-                          : joinTextarea(section[spec.field] as string[])
-                      }
-                      onChange={(event) => updateLines(id, spec.field, event.target.value)}
-                      onPaste={() => {
-                        if (
-                          section.type === "musica" &&
-                          (spec.field === "refrainLines" || spec.field === "verseLines")
-                        ) {
-                          scheduleAutoDetectRefrain(id);
-                        }
-                      }}
-                      className="min-h-32 w-full rounded border border-stone-300 p-2 text-sm"
-                    />
-                    <StyleEditor
-                      style={section.styles[spec.styleKey]}
-                      onPatch={(patch) => updateStyle(id, spec.styleKey, patch)}
-                    />
-                  </div>
-                ))}
-              </div>
-            </details>
+            <SectionEditorCard
+              key={id}
+              id={id}
+              index={index}
+              section={section}
+              onMove={moveSection}
+              onDetectRefrain={detectRefrain}
+              onDelete={removeSection}
+              onUpdateTitle={updateSectionTitle}
+              onToggleStartWithRefrain={toggleStartWithRefrain}
+              onToggleAutoDetectRefrain={toggleAutoDetectRefrain}
+              onUpdateLines={updateLines}
+              onScheduleAutoDetectRefrain={scheduleAutoDetectRefrain}
+              onUpdateStyle={updateStyle}
+            />
           );
         })}
       </main>

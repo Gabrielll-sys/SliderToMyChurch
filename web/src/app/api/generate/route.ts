@@ -157,58 +157,54 @@ function addAcclamationCombinedSlide(
   }
 
   const slide = createSlide(pptx);
-  if (acclamation.length > 0 && antiphon.length > 0) {
-    const topY = 0.2;
-    const blockGap = 0.12;
-    const acclamationHeight = Math.min(2.2, Math.max(1.2, acclamation.length * 0.95));
-    const antiphonY = topY + acclamationHeight + blockGap;
-    const antiphonHeight = Math.max(0.8, 8.8 - antiphonY);
-
-    slide.addText(acclamation.join("\n"), {
-      x: 0.2,
-      y: topY,
-      w: 15.6,
-      h: acclamationHeight,
-      fontFace: acclamationStyle.fontFace,
-      align: "center",
-      valign: "top",
-      color: COLOR_YELLOW,
-      bold: acclamationStyle.bold,
-      italic: acclamationStyle.italic,
-      fontSize: acclamationStyle.fontSize,
-      margin: 0.02,
-      fit: "shrink",
-    });
-    slide.addText(antiphon.join("\n"), {
-      x: 0.2,
-      y: antiphonY,
-      w: 15.6,
-      h: antiphonHeight,
-      fontFace: antiphonStyle.fontFace,
-      align: "center",
-      valign: "top",
+  const rows: Array<{ text: string; style: TextStyle; color: string }> = [];
+  for (const line of acclamation) {
+    const clean = line.trim();
+    if (clean.length === 0) {
+      continue;
+    }
+    rows.push({ text: clean, style: acclamationStyle, color: COLOR_YELLOW });
+  }
+  if (rows.length > 0 && antiphon.some((line) => line.trim().length > 0)) {
+    rows.push({
+      text: " ",
+      style: {
+        ...antiphonStyle,
+        fontSize: Math.max(8, Math.min(antiphonStyle.fontSize, 18)),
+        bold: false,
+        italic: false,
+      },
       color: COLOR_WHITE,
-      bold: antiphonStyle.bold,
-      italic: antiphonStyle.italic,
-      fontSize: antiphonStyle.fontSize,
-      margin: 0.02,
-      fit: "shrink",
     });
-    return 1;
+  }
+  for (const line of antiphon) {
+    const clean = line.trim();
+    if (clean.length === 0) {
+      continue;
+    }
+    rows.push({ text: clean, style: antiphonStyle, color: COLOR_WHITE });
   }
 
-  const source = acclamation.length > 0 ? acclamation : antiphon;
-  const sourceStyle = acclamation.length > 0 ? acclamationStyle : antiphonStyle;
-  const sourceColor = acclamation.length > 0 ? COLOR_YELLOW : COLOR_WHITE;
-  slide.addText(source.join("\n"), {
+  const runs: PptxGenJS.TextProps[] = rows.map((row, index) => ({
+    text: row.text,
+    options: {
+      color: row.color,
+      fontFace: row.style.fontFace,
+      fontSize: row.style.fontSize,
+      bold: row.style.bold,
+      italic: row.style.italic,
+      breakLine: index < rows.length - 1,
+    },
+  }));
+
+  if (runs.length === 0) {
+    return 0;
+  }
+
+  slide.addText(runs, {
     ...BOX,
-    fontFace: sourceStyle.fontFace,
     align: "center",
     valign: "middle",
-    color: sourceColor,
-    bold: sourceStyle.bold,
-    italic: sourceStyle.italic,
-    fontSize: sourceStyle.fontSize,
     margin: 0.04,
     fit: "shrink",
   });
@@ -590,6 +586,149 @@ function addFixedTextSection(
   return countTitle + countBody;
 }
 
+function addFixedTokenSlides(pptx: PptxGenJS, token: FixedToken): number {
+  switch (token) {
+    case "CREDO":
+      return addFixedTextSection(
+        pptx,
+        "ORAÇÃO DO CREDO",
+        TEXTOS_FIXOS.credo,
+        COLOR_WHITE,
+        90,
+        3,
+      );
+    case "PRECES":
+      return addTitle(pptx, "PRECES");
+    case "SANTO":
+      return addTitle(pptx, "SANTO");
+    case "CORDEIRO":
+      return addTitle(pptx, "CORDEIRO");
+    case "SANTA_LUZIA":
+      return addFixedTextSection(
+        pptx,
+        "ORAÇÃO A SANTA LUZIA",
+        TEXTOS_FIXOS.santa_luzia,
+        COLOR_WHITE,
+        90,
+        4,
+      );
+    case "AVISOS":
+      return addAvisosSlide(pptx);
+    default:
+      return 0;
+  }
+}
+
+function addMusicSectionSlides(pptx: PptxGenJS, section: SectionState): number {
+  const refrainLines = blocksToLines(section.refrainLines);
+  const verseBlocks = normalizeMusicBlocksForGeneration(section.verseLines);
+  let slides = addTitle(pptx, section.title, section.styles.title);
+
+  if (section.startWithRefrain && refrainLines.length > 0) {
+    slides += addStyledLines(
+      pptx,
+      refrainLines,
+      section.styles.refrain,
+      COLOR_YELLOW,
+    );
+  }
+
+  if (verseBlocks.length > 0) {
+    for (const block of verseBlocks) {
+      slides += addStyledLines(
+        pptx,
+        splitBlockLines(block),
+        section.styles.verse,
+        COLOR_WHITE,
+      );
+      if (refrainLines.length > 0) {
+        slides += addStyledLines(
+          pptx,
+          refrainLines,
+          section.styles.refrain,
+          COLOR_YELLOW,
+        );
+      }
+    }
+    return slides;
+  }
+
+  if (refrainLines.length > 0 && !section.startWithRefrain) {
+    slides += addStyledLines(
+      pptx,
+      refrainLines,
+      section.styles.refrain,
+      COLOR_YELLOW,
+    );
+  }
+
+  return slides;
+}
+
+function addReadingSectionSlides(pptx: PptxGenJS, section: SectionState): number {
+  const hasWhiteText = section.whiteTextLines.some((line) => line.trim().length > 0);
+  if (isSecondReadingSection(section) && !hasWhiteText) {
+    return 0;
+  }
+
+  const leituraTitle =
+    section.yellowTitleLines.length > 0
+      ? section.yellowTitleLines
+      : [section.title];
+
+  let slides = addStyledLines(
+    pptx,
+    leituraTitle,
+    section.styles.yellowTitle,
+    COLOR_YELLOW,
+  );
+  slides += addStyledLines(
+    pptx,
+    section.whiteTextLines,
+    section.styles.whiteText,
+    COLOR_YELLOW,
+  );
+  return slides;
+}
+
+function addAcclamationSectionSlides(pptx: PptxGenJS, section: SectionState): number {
+  let slides = addTitle(pptx, section.title, section.styles.title);
+  slides += addAcclamationCombinedSlide(
+    pptx,
+    section.acclamationLines,
+    section.styles.acclamation,
+    section.antiphonLines,
+    section.styles.antiphon,
+  );
+  return slides;
+}
+
+function addWordSectionSlides(pptx: PptxGenJS, section: SectionState): number {
+  let slides = addTitle(pptx, section.title, section.styles.title);
+  slides += addStyledLines(
+    pptx,
+    section.wordLines,
+    section.styles.word,
+    COLOR_YELLOW,
+  );
+  return slides;
+}
+
+function addSectionSlides(pptx: PptxGenJS, section: SectionState): number {
+  switch (section.type) {
+    case "musica":
+      return addMusicSectionSlides(pptx, section);
+    case "leitura":
+      return addReadingSectionSlides(pptx, section);
+    case "aclamacao":
+      return addAcclamationSectionSlides(pptx, section);
+    case "palavra":
+      return addWordSectionSlides(pptx, section);
+    default:
+      return 0;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -624,48 +763,8 @@ export async function POST(request: Request) {
 
     for (const item of generationSequence) {
       if (item.kind === "fixed") {
-        if (item.token === "CREDO") {
-          generatedSlides += addFixedTextSection(
-            pptx,
-            "ORAÇÃO DO CREDO",
-            TEXTOS_FIXOS.credo,
-            COLOR_WHITE,
-            90,
-            3,
-          );
-          continue;
-        }
-
-        if (item.token === "PRECES") {
-          generatedSlides += addTitle(pptx, "PRECES");
-          continue;
-        }
-
-        if (item.token === "SANTO") {
-          generatedSlides += addTitle(pptx, "SANTO");
-          continue;
-        }
-        if (item.token === "CORDEIRO") {
-          generatedSlides += addTitle(pptx, "CORDEIRO");
-          continue;
-        }
-
-        if (item.token === "SANTA_LUZIA") {
-          generatedSlides += addFixedTextSection(
-            pptx,
-            "ORAÇÃO A SANTA LUZIA",
-            TEXTOS_FIXOS.santa_luzia,
-            COLOR_WHITE,
-            90,
-            4,
-          );
-          continue;
-        }
-
-        if (item.token === "AVISOS") {
-          generatedSlides += addAvisosSlide(pptx);
-          continue;
-        }
+        generatedSlides += addFixedTokenSlides(pptx, item.token);
+        continue;
       }
 
       if (item.kind !== "section") {
@@ -677,85 +776,7 @@ export async function POST(request: Request) {
         continue;
       }
 
-      if (section.type === "musica") {
-        const refrainLines = blocksToLines(section.refrainLines);
-        const verseBlocks = normalizeMusicBlocksForGeneration(section.verseLines);
-        generatedSlides += addTitle(pptx, section.title, section.styles.title);
-        if (section.startWithRefrain && refrainLines.length > 0) {
-          generatedSlides += addStyledLines(
-            pptx,
-            refrainLines,
-            section.styles.refrain,
-            COLOR_YELLOW,
-          );
-        }
-        if (verseBlocks.length > 0) {
-          for (const block of verseBlocks) {
-            generatedSlides += addStyledLines(
-              pptx,
-              splitBlockLines(block),
-              section.styles.verse,
-              COLOR_WHITE,
-            );
-            if (refrainLines.length > 0) {
-              generatedSlides += addStyledLines(
-                pptx,
-                refrainLines,
-                section.styles.refrain,
-                COLOR_YELLOW,
-              );
-            }
-          }
-        } else if (refrainLines.length > 0 && !section.startWithRefrain) {
-          generatedSlides += addStyledLines(
-            pptx,
-            refrainLines,
-            section.styles.refrain,
-            COLOR_YELLOW,
-          );
-        }
-      }
-
-      if (section.type === "leitura") {
-        const hasWhiteText = section.whiteTextLines.some((line) => line.trim().length > 0);
-        if (isSecondReadingSection(section) && !hasWhiteText) {
-          continue;
-        }
-
-        const leituraTitle =
-          section.yellowTitleLines.length > 0
-            ? section.yellowTitleLines
-            : [section.title];
-        generatedSlides += addStyledLines(
-          pptx,
-          leituraTitle,
-          section.styles.yellowTitle,
-          COLOR_YELLOW,
-        );
-        generatedSlides += addStyledLines(
-          pptx,
-          section.whiteTextLines,
-          section.styles.whiteText,
-          COLOR_YELLOW,
-        );
-      }
-
-      if (section.type === "aclamacao") {
-        generatedSlides += addTitle(pptx, section.title, section.styles.title);
-        generatedSlides += addAcclamationCombinedSlide(
-          pptx,
-          section.acclamationLines,
-          section.styles.acclamation,
-          section.antiphonLines,
-          section.styles.antiphon,
-        );
-      }
-
-      if (section.type === "palavra") {
-        generatedSlides += addTitle(pptx, section.title, section.styles.title);
-        generatedSlides += addStyledLines(pptx, section.wordLines, section.styles.word, COLOR_YELLOW);
-      }
-
+      generatedSlides += addSectionSlides(pptx, section);
     }
 
     if (generatedSlides === 0) {
