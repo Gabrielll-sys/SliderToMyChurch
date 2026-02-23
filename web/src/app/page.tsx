@@ -92,8 +92,26 @@ function formatTodayISO(): string {
 }
 
 function parseFilename(contentDisposition: string | null): string {
-  const match = contentDisposition?.match(/filename="([^"]+)"/i);
-  return match?.[1] ?? "Missa.pptx";
+  if (!contentDisposition) {
+    return "Missa.pptx";
+  }
+
+  const utf8Match = contentDisposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]);
+    } catch {
+      // Fallback to legacy filename parsing below.
+    }
+  }
+
+  const quoted = contentDisposition.match(/filename="([^"]+)"/i);
+  if (quoted?.[1]) {
+    return quoted[1];
+  }
+
+  const plain = contentDisposition.match(/filename=([^;]+)/i);
+  return plain?.[1]?.trim() ?? "Missa.pptx";
 }
 
 function moveItem(items: string[], id: string, delta: -1 | 1): string[] {

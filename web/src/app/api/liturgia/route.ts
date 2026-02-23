@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 
 const LITURGIA_API_URL = "https://api-liturgia-diaria.vercel.app/";
 
@@ -13,26 +13,60 @@ function extractReference(title: string): string {
   return title.trim();
 }
 
-function extractCitation(headTitle: string): string {
+function normalizeCitationFormat(citation: string): string {
+  const compact = citation.replace(/\s+/g, " ").trim();
+  if (!compact) {
+    return "";
+  }
+  return compact.replace(/(\d)\s*,\s*(\d)/, "$1:$2");
+}
+
+function extractCitationContent(headTitle: string): string {
   if (!headTitle) {
     return "";
   }
+
   const match = headTitle.match(/\(([^)]+)\)/);
-  if (!match?.[1]) {
+  if (match?.[1]) {
+    return match[1].trim();
+  }
+
+  const fallback = headTitle.match(
+    /([1-3]?\s?[A-Za-zÀ-ÿ]{1,8}\s+\d+\s*[,.:]\s*\d+(?:\s*[-–]\s*\d+)?)/,
+  );
+  return fallback?.[1]?.trim() ?? "";
+}
+
+function extractCitation(headTitle: string): string {
+  const citation = normalizeCitationFormat(extractCitationContent(headTitle));
+  if (!citation) {
     return "";
   }
-  return `(${match[1].trim()})`;
+  return `(${citation})`;
 }
 
 function extractEvangelho(headTitle: string): string {
+  const base = "PROCLAMAÇÃO DO EVANGELHO";
   if (!headTitle) {
-    return "PROCLAMAÇÃO DO EVANGELHO";
+    return base;
   }
-  const match = headTitle.match(/segundo\s+([^,(]+)/i);
-  if (!match?.[1]) {
-    return "PROCLAMAÇÃO DO EVANGELHO";
+
+  const bySegundo = headTitle.match(/segundo\s+([A-Za-zÀ-ÿ\s]+)/i);
+  const byDe = headTitle.match(/evangelho\s+de\s+([A-Za-zÀ-ÿ\s]+)/i);
+  const rawEvangelist = (bySegundo?.[1] ?? byDe?.[1] ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const evangelist = rawEvangelist
+    .replace(/\s+\d+.*$/g, "")
+    .trim()
+    .toUpperCase();
+  const citation = extractCitation(headTitle);
+
+  if (!evangelist) {
+    return citation ? `${base} ${citation}` : base;
   }
-  return `PROCLAMAÇÃO DO EVANGELHO DE ${match[1].trim().toUpperCase()}`;
+
+  return citation ? `${base} DE ${evangelist} ${citation}` : `${base} DE ${evangelist}`;
 }
 
 export async function GET(request: NextRequest) {

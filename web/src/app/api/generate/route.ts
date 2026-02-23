@@ -362,6 +362,21 @@ function sanitizeTitleForFilename(title: string): string {
   return safe.length > 0 ? safe : "MISSA";
 }
 
+function toAsciiFilenameFallback(value: string): string {
+  const ascii = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\x20-\x7E]/g, "");
+  const safe = ascii
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, "")
+    .replace(/[. ]+$/g, "")
+    .slice(0, 120)
+    .trim();
+  return safe.length > 0 ? safe : "Missa";
+}
+
 function textHas(value: string, fragment: string): boolean {
   return value.toLowerCase().includes(fragment.toLowerCase());
 }
@@ -831,14 +846,15 @@ export async function POST(request: Request) {
     })) as Buffer;
     const bytes = new Uint8Array(buffer);
     const fileTitle = sanitizeTitleForFilename(payload.presentationTitle);
-    const filename = `Slides ${fileTitle}.pptx`;
+    const utf8Filename = `Slides ${fileTitle}.pptx`;
+    const asciiFilename = `Slides ${toAsciiFilenameFallback(fileTitle)}.pptx`;
 
     return new NextResponse(bytes, {
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(
-          filename,
+        "Content-Disposition": `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodeURIComponent(
+          utf8Filename,
         )}`,
       },
     });
