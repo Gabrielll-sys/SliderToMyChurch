@@ -1,4 +1,4 @@
-# Slides To My Church Web
+# slide-generator
 
 MVP em Next.js para:
 
@@ -28,8 +28,9 @@ npm run build
 1. Suba o repositório para o GitHub.
 2. No Vercel, clique em `New Project` e selecione este repositório.
 3. Em `Root Directory`, selecione `web`.
-4. Framework: `Next.js`.
-5. Clique em `Deploy`.
+4. Em `Project Name`, use `slide-generator` (para gerar domínio `slide-generator.vercel.app`, se disponível).
+5. Framework: `Next.js`.
+6. Clique em `Deploy`.
 
 ## Estrutura principal
 

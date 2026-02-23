@@ -15,7 +15,7 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Slides To My Church Web",
+  title: "slide-generator",
   description: "Editor web para geração de slides litúrgicos com Next.js",
 };
 

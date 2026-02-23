@@ -795,7 +795,7 @@ export async function POST(request: Request) {
     const pptx = new PptxGenJS();
     pptx.defineLayout({ name: "MASS_CUSTOM", width: 16, height: 9 });
     pptx.layout = "MASS_CUSTOM";
-    pptx.author = "Slides To My Church";
+    pptx.author = "slide-generator";
     pptx.subject = "Celebração litúrgica";
     pptx.title = payload.presentationTitle;
 
