@@ -586,6 +586,47 @@ function addFixedTextSection(
   return countTitle + countBody;
 }
 
+function addChunkedStyledText(
+  pptx: PptxGenJS,
+  lines: string[],
+  style: TextStyle,
+  color: string,
+  linesPerSlide: number,
+): number {
+  const validLines = applyUppercase(lines, style.uppercase)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  if (validLines.length === 0) {
+    return 0;
+  }
+
+  const safeLinesPerSlide = Math.max(1, Math.floor(linesPerSlide));
+  let slides = 0;
+  for (let index = 0; index < validLines.length; index += safeLinesPerSlide) {
+    const block = validLines.slice(index, index + safeLinesPerSlide).join(" ").trim();
+    if (!block) {
+      continue;
+    }
+
+    const slide = createSlide(pptx);
+    slide.addText(block, {
+      ...BOX,
+      fontFace: style.fontFace,
+      align: "center",
+      valign: "middle",
+      color,
+      bold: style.bold,
+      italic: style.italic,
+      fontSize: style.fontSize,
+      margin: 0.04,
+      fit: "shrink",
+    });
+    slides += 1;
+  }
+
+  return slides;
+}
+
 function addFixedTokenSlides(pptx: PptxGenJS, token: FixedToken): number {
   switch (token) {
     case "CREDO":
@@ -705,11 +746,13 @@ function addAcclamationSectionSlides(pptx: PptxGenJS, section: SectionState): nu
 
 function addWordSectionSlides(pptx: PptxGenJS, section: SectionState): number {
   let slides = addTitle(pptx, section.title, section.styles.title);
-  slides += addStyledLines(
+  const linesPerSlide = section.styles.word.hardMaxLines ?? 6;
+  slides += addChunkedStyledText(
     pptx,
     section.wordLines,
     section.styles.word,
     COLOR_YELLOW,
+    linesPerSlide,
   );
   return slides;
 }
