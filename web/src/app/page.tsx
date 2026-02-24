@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   buildInitialSectionOrder,
@@ -11,6 +11,8 @@ import {
   detectRefrainFromBlocks,
   joinTextareaBlocks,
   joinTextarea,
+  normalizeSectionState,
+  normalizeSectionType,
   normalizeRefrainBlockKey,
   splitTextareaBlocksForEditing,
   splitTextareaForEditing,
@@ -42,11 +44,18 @@ const BOOLEAN_OPTION_LABELS: Record<keyof GeneratorOptions, string> = {
 };
 
 const SECTION_TYPE_OPTIONS: Array<{ value: SectionType; label: string }> = [
-  { value: "musica", label: "Musica" },
+  { value: "musica", label: "Música" },
   { value: "leitura", label: "Leitura" },
-  { value: "aclamacao", label: "Aclamacao" },
+  { value: "aclamacao", label: "Aclamação" },
   { value: "palavra", label: "Palavra" },
 ];
+
+const SECTION_TYPE_LABELS: Record<SectionType, string> = {
+  musica: "Música",
+  leitura: "Leitura",
+  aclamacao: "Aclamação",
+  palavra: "Palavra",
+};
 
 const FONT_OPTIONS = ["Arial", "Calibri", "Montserrat", "Segoe UI", "Times New Roman"];
 
@@ -66,19 +75,143 @@ type InsertPlacement = "before" | "after";
 
 const EDITOR_SPECS: Record<SectionType, EditorSpec[]> = {
   musica: [
-    { field: "refrainLines", label: "Refrao", styleKey: "refrain" },
+    { field: "refrainLines", label: "Refrão", styleKey: "refrain" },
     { field: "verseLines", label: "Versos", styleKey: "verse" },
   ],
   leitura: [
-    { field: "yellowTitleLines", label: "Titulo amarelo", styleKey: "yellowTitle" },
+    { field: "yellowTitleLines", label: "Título amarelo", styleKey: "yellowTitle" },
     { field: "whiteTextLines", label: "Texto branco", styleKey: "whiteText" },
   ],
   aclamacao: [
-    { field: "acclamationLines", label: "Aclamacao", styleKey: "acclamation" },
-    { field: "antiphonLines", label: "Antifona", styleKey: "antiphon" },
+    { field: "acclamationLines", label: "Aclamação", styleKey: "acclamation" },
+    { field: "antiphonLines", label: "Antífona", styleKey: "antiphon" },
   ],
   palavra: [{ field: "wordLines", label: "Palavra", styleKey: "word" }],
 };
+
+const LOCAL_STORAGE_KEY = "slide-generator:editor-state:v1";
+const DEFAULT_PRESENTATION_TITLE = "DOMINGO DA\nQUARESMA";
+
+type StatusTone = "neutral" | "success" | "error" | "loading" | "warning";
+
+type StatusState = {
+  message: string;
+  tone: StatusTone;
+};
+
+type PersistedEditorState = {
+  presentationTitle: string;
+  liturgiaDate: string;
+  options: GeneratorOptions;
+  sections: SectionsState;
+  sectionOrder: string[];
+};
+
+const STATUS_TONE_CLASSES: Record<StatusTone, string> = {
+  neutral: "text-stone-700",
+  success: "text-emerald-700",
+  error: "text-red-700",
+  loading: "text-sky-700",
+  warning: "text-amber-700",
+};
+
+function isIsoDate(value: unknown): value is string {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function normalizeOptions(value: unknown): GeneratorOptions {
+  const raw =
+    value && typeof value === "object" ? (value as Partial<GeneratorOptions>) : {};
+
+  return {
+    includeCredo:
+      typeof raw.includeCredo === "boolean"
+        ? raw.includeCredo
+        : DEFAULT_GENERATOR_OPTIONS.includeCredo,
+    includePreces:
+      typeof raw.includePreces === "boolean"
+        ? raw.includePreces
+        : DEFAULT_GENERATOR_OPTIONS.includePreces,
+    includeSanto:
+      typeof raw.includeSanto === "boolean"
+        ? raw.includeSanto
+        : DEFAULT_GENERATOR_OPTIONS.includeSanto,
+    includeCordeiro:
+      typeof raw.includeCordeiro === "boolean"
+        ? raw.includeCordeiro
+        : DEFAULT_GENERATOR_OPTIONS.includeCordeiro,
+    includeSantaLuzia:
+      typeof raw.includeSantaLuzia === "boolean"
+        ? raw.includeSantaLuzia
+        : DEFAULT_GENERATOR_OPTIONS.includeSantaLuzia,
+    includeAvisos:
+      typeof raw.includeAvisos === "boolean"
+        ? raw.includeAvisos
+        : DEFAULT_GENERATOR_OPTIONS.includeAvisos,
+  };
+}
+
+function normalizeSections(value: unknown): SectionsState {
+  const defaults = buildInitialSections();
+  const rawSections =
+    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+
+  const sections: SectionsState = {};
+
+  for (const [id, fallback] of Object.entries(defaults)) {
+    sections[id] = normalizeSectionState(rawSections[id], fallback);
+  }
+
+  for (const [id, incomingValue] of Object.entries(rawSections)) {
+    if (sections[id]) {
+      continue;
+    }
+
+    const incoming =
+      incomingValue && typeof incomingValue === "object"
+        ? (incomingValue as Record<string, unknown>)
+        : {};
+    const name =
+      typeof incoming.name === "string" && incoming.name.trim().length > 0
+        ? incoming.name.trim()
+        : id;
+    const type = normalizeSectionType(incoming.type, "musica");
+    const base = createEmptySection(id, name, type);
+    sections[id] = normalizeSectionState(incomingValue, base);
+  }
+
+  return sections;
+}
+
+function normalizeSectionOrderForState(
+  orderValue: unknown,
+  sections: SectionsState,
+): string[] {
+  const source = Array.isArray(orderValue)
+    ? orderValue.filter((item): item is string => typeof item === "string")
+    : [];
+
+  const order: string[] = [];
+  const seen = new Set<string>();
+
+  for (const id of source) {
+    if (!sections[id] || seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    order.push(id);
+  }
+
+  for (const id of Object.keys(sections)) {
+    if (seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    order.push(id);
+  }
+
+  return order;
+}
 
 function isMusicBlockField(field: LineField): field is "refrainLines" | "verseLines" {
   return field === "refrainLines" || field === "verseLines";
@@ -145,29 +278,37 @@ function StyleEditor({
   return (
     <div className="space-y-2 rounded-lg border border-stone-200 bg-stone-50 p-2">
       <div className="grid gap-2 sm:grid-cols-5">
-        <select
-          value={style.fontFace}
-          onChange={(event) => onPatch({ fontFace: event.target.value })}
-          className="rounded border border-stone-300 px-2 py-1 text-xs"
-        >
-          {FONT_OPTIONS.map((font) => (
-            <option key={font}>{font}</option>
-          ))}
-        </select>
-        <input
-          type="number"
-          value={style.fontSize}
-          min={8}
-          max={120}
-          onChange={(event) => {
-            const next = Number(event.target.value);
-            if (Number.isFinite(next)) {
-              onPatch({ fontSize: clamp(Math.round(next), 8, 120) });
-            }
-          }}
-          className="rounded border border-stone-300 px-2 py-1 text-xs"
-        />
-        <label className="flex items-center gap-1 text-xs">
+        <label className="space-y-1 text-sm">
+          <span className="font-medium text-stone-700">Fonte</span>
+          <select
+            value={style.fontFace}
+            onChange={(event) => onPatch({ fontFace: event.target.value })}
+            className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+            aria-label="Fonte do texto"
+          >
+            {FONT_OPTIONS.map((font) => (
+              <option key={font}>{font}</option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1 text-sm">
+          <span className="font-medium text-stone-700">Tamanho</span>
+          <input
+            type="number"
+            value={style.fontSize}
+            min={8}
+            max={120}
+            onChange={(event) => {
+              const next = Number(event.target.value);
+              if (Number.isFinite(next)) {
+                onPatch({ fontSize: clamp(Math.round(next), 8, 120) });
+              }
+            }}
+            className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+            aria-label="Tamanho da fonte"
+          />
+        </label>
+        <label className="flex items-center gap-1 text-sm">
           <input
             type="checkbox"
             checked={style.bold}
@@ -175,7 +316,7 @@ function StyleEditor({
           />
           Negrito
         </label>
-        <label className="flex items-center gap-1 text-xs">
+        <label className="flex items-center gap-1 text-sm">
           <input
             type="checkbox"
             checked={style.italic}
@@ -183,7 +324,7 @@ function StyleEditor({
           />
           Itálico
         </label>
-        <label className="flex items-center gap-1 text-xs">
+        <label className="flex items-center gap-1 text-sm">
           <input
             type="checkbox"
             checked={style.uppercase}
@@ -193,70 +334,82 @@ function StyleEditor({
         </label>
       </div>
       <div className="grid gap-2 sm:grid-cols-4">
-        <input
-          type="number"
-          step={0.01}
-          min={0.9}
-          max={1.8}
-          value={style.lineSpacing}
-          onChange={(event) => {
-            const next = Number(event.target.value);
-            if (Number.isFinite(next)) {
-              onPatch({ lineSpacing: clamp(next, 0.9, 1.8) });
-            }
-          }}
-          className="rounded border border-stone-300 px-2 py-1 text-xs"
-          title="Espaçamento entre linhas"
-        />
-        <input
-          type="number"
-          step={0.01}
-          min={0.3}
-          max={0.95}
-          value={style.minFillRatio}
-          onChange={(event) => {
-            const next = Number(event.target.value);
-            if (Number.isFinite(next)) {
-              onPatch({ minFillRatio: clamp(next, 0.3, 0.95) });
-            }
-          }}
-          className="rounded border border-stone-300 px-2 py-1 text-xs"
-          title="Preenchimento mínimo do slide"
-        />
-        <input
-          type="number"
-          min={1}
-          max={8}
-          value={style.minLastLines}
-          onChange={(event) => {
-            const next = Number(event.target.value);
-            if (Number.isFinite(next)) {
-              onPatch({ minLastLines: clamp(Math.round(next), 1, 8) });
-            }
-          }}
-          className="rounded border border-stone-300 px-2 py-1 text-xs"
-          title="Linhas mínimas na última página"
-        />
-        <input
-          type="number"
-          min={1}
-          max={12}
-          value={style.hardMaxLines ?? ""}
-          onChange={(event) => {
-            const raw = event.target.value.trim();
-            if (!raw) {
-              onPatch({ hardMaxLines: undefined });
-              return;
-            }
-            const next = Number(raw);
-            if (Number.isFinite(next)) {
-              onPatch({ hardMaxLines: clamp(Math.round(next), 1, 12) });
-            }
-          }}
-          className="rounded border border-stone-300 px-2 py-1 text-xs"
-          title="Máximo de linhas por slide (vazio = automático)"
-          placeholder="hard max"
-        />
+        <label className="space-y-1 text-sm">
+          <span className="font-medium text-stone-700">Espaçamento</span>
+          <input
+            type="number"
+            step={0.01}
+            min={0.9}
+            max={1.8}
+            value={style.lineSpacing}
+            onChange={(event) => {
+              const next = Number(event.target.value);
+              if (Number.isFinite(next)) {
+                onPatch({ lineSpacing: clamp(next, 0.9, 1.8) });
+              }
+            }}
+            className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+            aria-label="Espaçamento entre linhas"
+          />
+        </label>
+        <label className="space-y-1 text-sm">
+          <span className="font-medium text-stone-700">Preenchimento</span>
+          <input
+            type="number"
+            step={0.01}
+            min={0.3}
+            max={0.95}
+            value={style.minFillRatio}
+            onChange={(event) => {
+              const next = Number(event.target.value);
+              if (Number.isFinite(next)) {
+                onPatch({ minFillRatio: clamp(next, 0.3, 0.95) });
+              }
+            }}
+            className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+            aria-label="Preenchimento mínimo do slide"
+          />
+        </label>
+        <label className="space-y-1 text-sm">
+          <span className="font-medium text-stone-700">Mín. última página</span>
+          <input
+            type="number"
+            min={1}
+            max={8}
+            value={style.minLastLines}
+            onChange={(event) => {
+              const next = Number(event.target.value);
+              if (Number.isFinite(next)) {
+                onPatch({ minLastLines: clamp(Math.round(next), 1, 8) });
+              }
+            }}
+            className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+            aria-label="Linhas mínimas na última página"
+          />
+        </label>
+        <label className="space-y-1 text-sm">
+          <span className="font-medium text-stone-700">Máx. por slide</span>
+          <input
+            type="number"
+            min={1}
+            max={12}
+            value={style.hardMaxLines ?? ""}
+            onChange={(event) => {
+              const raw = event.target.value.trim();
+              if (!raw) {
+                onPatch({ hardMaxLines: undefined });
+                return;
+              }
+              const next = Number(raw);
+              if (Number.isFinite(next)) {
+                onPatch({ hardMaxLines: clamp(Math.round(next), 1, 12) });
+              }
+            }}
+            className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+            placeholder="Auto"
+            aria-label="Máximo de linhas por slide"
+          />
+        </label>
       </div>
     </div>
   );
@@ -264,8 +417,11 @@ function StyleEditor({
 
 type SectionEditorCardProps = {
   id: string;
-  index: number;
+  isOpen: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
   section: SectionState;
+  onToggleOpen: (id: string, open: boolean) => void;
   onMove: (id: string, delta: -1 | 1) => void;
   onDetectRefrain: (id: string) => void;
   onDelete: (id: string) => void;
@@ -279,8 +435,11 @@ type SectionEditorCardProps = {
 
 function SectionEditorCard({
   id,
-  index,
+  isOpen,
+  canMoveUp,
+  canMoveDown,
   section,
+  onToggleOpen,
   onMove,
   onDetectRefrain,
   onDelete,
@@ -292,67 +451,80 @@ function SectionEditorCard({
   onUpdateStyle,
 }: SectionEditorCardProps) {
   return (
-    <details open={index === 0} className="rounded-xl border border-stone-200 bg-white">
+    <details
+      open={isOpen}
+      onToggle={(event) => onToggleOpen(id, event.currentTarget.open)}
+      className="rounded-xl border border-stone-200 bg-white"
+    >
       <summary className="flex cursor-pointer justify-between px-4 py-2 text-sm font-semibold">
         <span>
-          {(section.title || section.name)} ({section.type})
+          {(section.title || section.name)} ({SECTION_TYPE_LABELS[section.type]})
         </span>
-        <span>{">"}</span>
+        <span>{isOpen ? "▾" : "▸"}</span>
       </summary>
 
       <div className="space-y-3 border-t border-stone-200 p-4">
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => onMove(id, -1)}
-            className="rounded border border-stone-300 px-2 py-1 text-xs"
+            disabled={!canMoveUp}
+            className={`rounded border border-stone-300 px-2 py-1 text-sm ${
+              canMoveUp ? "" : "cursor-not-allowed opacity-50"
+            }`}
           >
-            Mover Seção Para Cima
+            Mover seção para cima
           </button>
           <button
             onClick={() => onMove(id, 1)}
-            className="rounded border border-stone-300 px-2 py-1 text-xs"
+            disabled={!canMoveDown}
+            className={`rounded border border-stone-300 px-2 py-1 text-sm ${
+              canMoveDown ? "" : "cursor-not-allowed opacity-50"
+            }`}
           >
-            Mover Seção Para Baixo
+            Mover seção para baixo
           </button>
           {section.type === "musica" && (
             <button
               onClick={() => onDetectRefrain(id)}
-              className="rounded border border-amber-300 px-2 py-1 text-xs"
+              className="rounded border border-amber-300 px-2 py-1 text-sm"
             >
-              Detectar refrao
+              Detectar refrão
             </button>
           )}
           <button
             onClick={() => onDelete(id)}
-            className="rounded border border-red-300 px-2 py-1 text-xs"
+            className="rounded border border-red-300 px-2 py-1 text-sm"
           >
-            Excluir secao
+            Excluir seção
           </button>
         </div>
 
-        <input
-          value={section.title}
-          onChange={(event) => onUpdateTitle(id, event.target.value)}
-          className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
-        />
+        <label className="space-y-1 text-sm">
+          <span className="font-medium text-stone-700">Título da seção</span>
+          <input
+            value={section.title}
+            onChange={(event) => onUpdateTitle(id, event.target.value)}
+            className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+          />
+        </label>
 
         {section.type === "musica" && (
           <div className="flex flex-wrap gap-3">
-            <label className="flex items-center gap-2 text-xs">
+            <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={section.startWithRefrain}
                 onChange={() => onToggleStartWithRefrain(id)}
               />
-              Iniciar com refrao
+              Iniciar com refrão
             </label>
-            <label className="flex items-center gap-2 text-xs">
+            <label className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
                 checked={section.autoDetectRefrain}
                 onChange={() => onToggleAutoDetectRefrain(id)}
               />
-              Detectar e reorganizar refrao automaticamente ao colar
+              Detectar e reorganizar refrão automaticamente ao colar
             </label>
           </div>
         )}
@@ -370,7 +542,10 @@ function SectionEditorCard({
 
           return (
             <div key={spec.field} className="space-y-1">
-              <p className="text-xs font-semibold">{spec.label}</p>
+              <p className="text-sm font-semibold">{spec.label}</p>
+              <p className="text-xs text-stone-500">
+                {isMusicField ? "Separe blocos com uma linha em branco." : "Uma linha por frase."}
+              </p>
               <textarea
                 value={value}
                 onChange={(event) => onUpdateLines(id, spec.field, event.target.value)}
@@ -380,6 +555,7 @@ function SectionEditorCard({
                   }
                 }}
                 className="min-h-32 w-full rounded border border-stone-300 p-2 text-sm"
+                aria-label={`${spec.label} da seção ${section.title || section.name}`}
               />
               <StyleEditor
                 style={section.styles[spec.styleKey]}
@@ -397,16 +573,24 @@ export default function Home() {
   const initialLiturgiaDate = useMemo(() => formatTodayISO(), []);
   const [sections, setSections] = useState<SectionsState>(() => buildInitialSections());
   const [sectionOrder, setSectionOrder] = useState<string[]>(() => buildInitialSectionOrder());
-  const [presentationTitle, setPresentationTitle] = useState("DOMINGO DA\nQUARESMA");
+  const [openSectionIds, setOpenSectionIds] = useState<string[]>([]);
+  const [presentationTitle, setPresentationTitle] = useState(DEFAULT_PRESENTATION_TITLE);
   const [liturgiaDate, setLiturgiaDate] = useState(initialLiturgiaDate);
   const [options, setOptions] = useState<GeneratorOptions>(DEFAULT_GENERATOR_OPTIONS);
-  const [status, setStatus] = useState("Pronto.");
+  const [status, setStatus] = useState<StatusState>({ message: "Pronto.", tone: "neutral" });
   const [loadingLiturgia, setLoadingLiturgia] = useState(false);
   const [loadingPpt, setLoadingPpt] = useState(false);
+  const [isStorageHydrated, setIsStorageHydrated] = useState(false);
+  const [skipInitialLiturgiaImport, setSkipInitialLiturgiaImport] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
   const [newSectionType, setNewSectionType] = useState<SectionType>("musica");
   const [insertReferenceId, setInsertReferenceId] = useState("");
   const [insertPlacement, setInsertPlacement] = useState<InsertPlacement>("after");
+  const newSectionNameInputRef = useRef<HTMLInputElement>(null);
+
+  const setStatusMessage = useCallback((message: string, tone: StatusTone = "neutral") => {
+    setStatus({ message, tone });
+  }, []);
 
   const updateSection = (id: string, updater: (section: SectionState) => SectionState) => {
     setSections((current) => {
@@ -428,6 +612,24 @@ export default function Home() {
       return next;
     });
     setSectionOrder((current) => current.filter((value) => value !== id));
+    setOpenSectionIds((current) => current.filter((value) => value !== id));
+  };
+
+  const requestDeleteSection = (id: string) => {
+    const section = sections[id];
+    if (!section) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Excluir a seção "${section.title || section.name}"?\nEssa ação não pode ser desfeita.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    removeSection(id);
+    setStatusMessage("Seção excluída.", "warning");
   };
 
   const updateByCanonical = useCallback((
@@ -470,6 +672,8 @@ export default function Home() {
   const addSection = () => {
     const name = newSectionName.trim();
     if (!name) {
+      setStatusMessage("Informe um nome para a nova seção.", "error");
+      newSectionNameInputRef.current?.focus();
       return;
     }
     const id = buildUniqueSectionId(name, sectionOrder);
@@ -491,8 +695,10 @@ export default function Home() {
       next.splice(insertAt, 0, id);
       return next;
     });
+    setOpenSectionIds((current) => (current.includes(id) ? current : [...current, id]));
     setInsertReferenceId(id);
     setNewSectionName("");
+    setStatusMessage("Seção adicionada.", "success");
   };
 
   const withDetectedRefrainFromVerses = (section: SectionState): SectionState | null => {
@@ -577,10 +783,11 @@ export default function Home() {
     }
     const next = withDetectedRefrainFromVerses(section);
     if (!next) {
-      setStatus("Nao foi possivel detectar refrao.");
+      setStatusMessage("Não foi possível detectar refrão nesta seção.", "error");
       return;
     }
     updateSection(id, () => next);
+    setStatusMessage("Refrão detectado e reorganizado.", "success");
   };
 
   const scheduleAutoDetectRefrain = (id: string) => {
@@ -623,6 +830,7 @@ export default function Home() {
   const fetchLiturgiaForDate = useCallback(async (date: string, silent = false) => {
     if (!silent) {
       setLoadingLiturgia(true);
+      setStatusMessage("Buscando liturgia...", "loading");
     }
     try {
       const response = await fetch(`/api/liturgia?date=${date}`, { cache: "no-store" });
@@ -633,26 +841,96 @@ export default function Home() {
 
       applyLiturgiaData(data);
       if (!silent) {
-        setStatus("Liturgia importada.");
+        setStatusMessage("Liturgia importada.", "success");
       }
     } catch (error) {
       if (!silent) {
-        setStatus(error instanceof Error ? error.message : "Erro na liturgia.");
+        setStatusMessage(
+          error instanceof Error ? error.message : "Erro na liturgia.",
+          "error",
+        );
       }
     } finally {
       if (!silent) {
         setLoadingLiturgia(false);
       }
     }
-  }, [applyLiturgiaData]);
+  }, [applyLiturgiaData, setStatusMessage]);
 
   const fetchLiturgia = useCallback(async () => {
     await fetchLiturgiaForDate(liturgiaDate, false);
   }, [fetchLiturgiaForDate, liturgiaDate]);
 
   useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (!raw) {
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as Partial<PersistedEditorState>;
+      const restoredSections = normalizeSections(parsed.sections);
+      const restoredOrder = normalizeSectionOrderForState(parsed.sectionOrder, restoredSections);
+
+      if (typeof parsed.presentationTitle === "string") {
+        setPresentationTitle(parsed.presentationTitle);
+      }
+      if (isIsoDate(parsed.liturgiaDate)) {
+        setLiturgiaDate(parsed.liturgiaDate);
+      }
+
+      setOptions(normalizeOptions(parsed.options));
+      setSections(restoredSections);
+      setSectionOrder(restoredOrder);
+      setSkipInitialLiturgiaImport(true);
+      setStatusMessage("Rascunho restaurado.", "success");
+    } catch {
+      window.localStorage.removeItem(LOCAL_STORAGE_KEY);
+    } finally {
+      setIsStorageHydrated(true);
+    }
+  }, [setStatusMessage]);
+
+  useEffect(() => {
+    if (!isStorageHydrated) {
+      return;
+    }
+    const payload: PersistedEditorState = {
+      presentationTitle,
+      liturgiaDate,
+      options,
+      sections,
+      sectionOrder,
+    };
+
+    try {
+      window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Ignore storage quota and availability errors.
+    }
+  }, [isStorageHydrated, liturgiaDate, options, presentationTitle, sectionOrder, sections]);
+
+  useEffect(() => {
+    if (!isStorageHydrated || skipInitialLiturgiaImport) {
+      return;
+    }
     void fetchLiturgiaForDate(initialLiturgiaDate, true);
-  }, [fetchLiturgiaForDate, initialLiturgiaDate]);
+  }, [
+    fetchLiturgiaForDate,
+    initialLiturgiaDate,
+    isStorageHydrated,
+    skipInitialLiturgiaImport,
+  ]);
+
+  useEffect(() => {
+    setOpenSectionIds((current) => {
+      const filtered = current.filter((id) => sectionOrder.includes(id));
+      if (filtered.length > 0 || sectionOrder.length === 0) {
+        return filtered;
+      }
+      return [sectionOrder[0]];
+    });
+  }, [sectionOrder]);
 
   useEffect(() => {
     if (sectionOrder.length === 0) {
@@ -668,6 +946,7 @@ export default function Home() {
 
   const generatePptx = async () => {
     setLoadingPpt(true);
+    setStatusMessage("Gerando apresentação...", "loading");
     const payload: GeneratePayload = { presentationTitle, sectionOrder, sections, options };
     try {
       const response = await fetch("/api/generate", {
@@ -689,9 +968,12 @@ export default function Home() {
       anchor.remove();
       window.URL.revokeObjectURL(url);
 
-      setStatus("Download iniciado.");
+      setStatusMessage("Download iniciado.", "success");
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Erro ao gerar arquivo.");
+      setStatusMessage(
+        error instanceof Error ? error.message : "Erro ao gerar arquivo.",
+        "error",
+      );
     } finally {
       setLoadingPpt(false);
     }
@@ -703,6 +985,19 @@ export default function Home() {
 
   const moveSection = (id: string, delta: -1 | 1) => {
     setSectionOrder((current) => moveItem(current, id, delta));
+  };
+
+  const toggleSectionOpen = (id: string, open: boolean) => {
+    setOpenSectionIds((current) => {
+      const has = current.includes(id);
+      if (open) {
+        return has ? current : [...current, id];
+      }
+      if (!has) {
+        return current;
+      }
+      return current.filter((item) => item !== id);
+    });
   };
 
   const updateSectionTitle = (id: string, value: string) => {
@@ -723,22 +1018,74 @@ export default function Home() {
     }));
   };
 
+  const restoreDefaults = async () => {
+    const confirmed = window.confirm(
+      "Restaurar o editor para o padrão inicial?\nIsso removerá o rascunho atual desta sessão.",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const nextSections = buildInitialSections();
+    const nextOrder = buildInitialSectionOrder();
+
+    setSections(nextSections);
+    setSectionOrder(nextOrder);
+    setOpenSectionIds(nextOrder.length > 0 ? [nextOrder[0]] : []);
+    setPresentationTitle(DEFAULT_PRESENTATION_TITLE);
+    setLiturgiaDate(initialLiturgiaDate);
+    setOptions(DEFAULT_GENERATOR_OPTIONS);
+    setNewSectionName("");
+    setNewSectionType("musica");
+    setInsertPlacement("after");
+    setInsertReferenceId(nextOrder[nextOrder.length - 1] ?? "");
+    setSkipInitialLiturgiaImport(false);
+
+    try {
+      window.localStorage.removeItem(LOCAL_STORAGE_KEY);
+    } catch {
+      // Ignore storage availability errors.
+    }
+
+    await fetchLiturgiaForDate(initialLiturgiaDate, false);
+    setStatusMessage("Editor restaurado para o padrão inicial.", "warning");
+  };
+
+  const canAddSection = newSectionName.trim().length > 0;
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#f5f0d3_0%,#f4f7fb_45%,#eef1f7_100%)] p-4 md:p-8">
       <main className="mx-auto flex max-w-6xl flex-col gap-4">
+        <h1 className="sr-only">Editor de slides litúrgicos</h1>
         <section className="rounded-xl border border-stone-200 bg-white p-4">
+          <label
+            htmlFor="presentationTitle"
+            className="mb-1 block text-sm font-semibold text-stone-800"
+          >
+            Título da apresentação
+          </label>
           <textarea
+            id="presentationTitle"
             value={presentationTitle}
             onChange={(event) => setPresentationTitle(event.target.value)}
             className="mb-2 min-h-40 w-full rounded border border-stone-300 p-2 text-sm"
+            placeholder="Ex.: DOMINGO DA QUARESMA"
           />
-          <div className="flex flex-wrap gap-2">
-            <input
-              type="date"
-              value={liturgiaDate}
-              onChange={(event) => setLiturgiaDate(event.target.value)}
-              className="rounded border border-stone-300 px-2 py-1 text-sm"
-            />
+          <p className="mb-3 text-xs text-stone-500">
+            Use uma linha por bloco de título. Exemplo: linha 1 com o tema e linha 2 com o tempo
+            litúrgico.
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-stone-700">Data da liturgia</span>
+              <input
+                id="liturgiaDate"
+                type="date"
+                value={liturgiaDate}
+                onChange={(event) => setLiturgiaDate(event.target.value)}
+                className="rounded border border-stone-300 px-2 py-1 text-sm"
+              />
+            </label>
             <button
               onClick={fetchLiturgia}
               disabled={loadingLiturgia || loadingPpt}
@@ -753,22 +1100,41 @@ export default function Home() {
             >
               {loadingPpt ? "Gerando..." : "Gerar .pptx"}
             </button>
-            <span className="text-sm text-stone-700">{status}</span>
+            <p
+              role="status"
+              aria-live="polite"
+              className={`text-sm font-medium ${STATUS_TONE_CLASSES[status.tone]}`}
+            >
+              {status.message}
+            </p>
           </div>
         </section>
 
         <section className="rounded-xl border border-stone-200 bg-white p-4">
-          <div className="mb-2 flex flex-wrap gap-2">
-            <input
-              value={newSectionName}
-              onChange={(event) => setNewSectionName(event.target.value)}
-              placeholder="Nova secao"
-              className="rounded border border-stone-300 px-2 py-1 text-sm"
-            />
-            <select
-              value={newSectionType}
-              onChange={(event) => setNewSectionType(event.target.value as SectionType)}
-              className="rounded border border-stone-300 px-2 py-1 text-sm"
+          <p className="mb-2 text-sm font-semibold text-stone-800">Adicionar seção</p>
+          <div className="mb-2 flex flex-wrap items-end gap-2">
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-stone-700">Nome</span>
+              <input
+                ref={newSectionNameInputRef}
+                value={newSectionName}
+                onChange={(event) => setNewSectionName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void addSection();
+                  }
+                }}
+                placeholder="Nova seção"
+                className="rounded border border-stone-300 px-2 py-1 text-sm"
+              />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-stone-700">Tipo</span>
+              <select
+                value={newSectionType}
+                onChange={(event) => setNewSectionType(event.target.value as SectionType)}
+                className="rounded border border-stone-300 px-2 py-1 text-sm"
               >
                 {SECTION_TYPE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -776,37 +1142,59 @@ export default function Home() {
                   </option>
                 ))}
               </select>
-            <select
-              value={insertPlacement}
-              onChange={(event) => setInsertPlacement(event.target.value as InsertPlacement)}
-              className="rounded border border-stone-300 px-2 py-1 text-sm"
-            >
-              <option value="after">Inserir apos</option>
-              <option value="before">Inserir antes</option>
-            </select>
-            <select
-              value={insertReferenceId}
-              onChange={(event) => setInsertReferenceId(event.target.value)}
-              className="rounded border border-stone-300 px-2 py-1 text-sm"
-              disabled={sectionOrder.length === 0}
-            >
-              {sectionOrder.map((id) => (
-                <option key={id} value={id}>
-                  {sections[id]?.name ?? id}
-                </option>
-              ))}
-            </select>
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-stone-700">Posição</span>
+              <select
+                value={insertPlacement}
+                onChange={(event) => setInsertPlacement(event.target.value as InsertPlacement)}
+                className="rounded border border-stone-300 px-2 py-1 text-sm"
+              >
+                <option value="after">Inserir após</option>
+                <option value="before">Inserir antes</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="font-medium text-stone-700">Referência</span>
+              <select
+                value={insertReferenceId}
+                onChange={(event) => setInsertReferenceId(event.target.value)}
+                className="rounded border border-stone-300 px-2 py-1 text-sm"
+                disabled={sectionOrder.length === 0}
+              >
+                {sectionOrder.map((id) => (
+                  <option key={id} value={id}>
+                    {sections[id]?.name ?? id}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               onClick={addSection}
-              className="rounded bg-stone-800 px-3 py-1 text-sm font-semibold text-white"
+              disabled={!canAddSection}
+              className={`rounded px-3 py-1 text-sm font-semibold text-white ${
+                canAddSection
+                  ? "bg-stone-800"
+                  : "cursor-not-allowed bg-stone-400"
+              }`}
             >
               Adicionar
             </button>
+            <button
+              onClick={() => void restoreDefaults()}
+              className="rounded border border-stone-300 px-3 py-1 text-sm font-semibold text-stone-800"
+            >
+              Restaurar padrão
+            </button>
           </div>
+          <p className="mb-2 text-xs text-stone-500">
+            Dica: escolha a posição e a referência para inserir a nova seção no ponto certo da
+            celebração.
+          </p>
 
           <div className="mb-2 flex flex-wrap gap-2">
             {BOOLEAN_OPTION_KEYS.map((key) => (
-              <label key={key} className="flex items-center gap-1 text-xs">
+              <label key={key} className="flex items-center gap-1 text-sm">
                 <input type="checkbox" checked={Boolean(options[key])} onChange={() => toggleOption(key)} />
                 {BOOLEAN_OPTION_LABELS[key]}
               </label>
@@ -824,11 +1212,14 @@ export default function Home() {
             <SectionEditorCard
               key={id}
               id={id}
-              index={index}
+              isOpen={openSectionIds.includes(id)}
+              canMoveUp={index > 0}
+              canMoveDown={index < sectionOrder.length - 1}
               section={section}
+              onToggleOpen={toggleSectionOpen}
               onMove={moveSection}
               onDetectRefrain={detectRefrain}
-              onDelete={removeSection}
+              onDelete={requestDeleteSection}
               onUpdateTitle={updateSectionTitle}
               onToggleStartWithRefrain={toggleStartWithRefrain}
               onToggleAutoDetectRefrain={toggleAutoDetectRefrain}
