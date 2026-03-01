@@ -72,7 +72,6 @@ type StyleKey = keyof SectionStyles;
 
 type EditorSpec = { field: LineField; label: string; styleKey: StyleKey };
 type InsertPlacement = "before" | "after";
-type ExportFormat = "pptx" | "pdf";
 
 const EDITOR_SPECS: Record<SectionType, EditorSpec[]> = {
   musica: [
@@ -225,12 +224,9 @@ function formatTodayISO(): string {
   ).padStart(2, "0")}`;
 }
 
-function parseFilename(
-  contentDisposition: string | null,
-  fallbackFilename = "Missa.pptx",
-): string {
+function parseFilename(contentDisposition: string | null): string {
   if (!contentDisposition) {
-    return fallbackFilename;
+    return "Missa.pptx";
   }
 
   const utf8Match = contentDisposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
@@ -248,7 +244,7 @@ function parseFilename(
   }
 
   const plain = contentDisposition.match(/filename=([^;]+)/i);
-  return plain?.[1]?.trim() ?? fallbackFilename;
+  return plain?.[1]?.trim() ?? "Missa.pptx";
 }
 
 function moveItem(items: string[], id: string, delta: -1 | 1): string[] {
@@ -583,7 +579,7 @@ export default function Home() {
   const [options, setOptions] = useState<GeneratorOptions>(DEFAULT_GENERATOR_OPTIONS);
   const [status, setStatus] = useState<StatusState>({ message: "Pronto.", tone: "neutral" });
   const [loadingLiturgia, setLoadingLiturgia] = useState(false);
-  const [loadingExport, setLoadingExport] = useState<ExportFormat | null>(null);
+  const [loadingPpt, setLoadingPpt] = useState(false);
   const [isStorageHydrated, setIsStorageHydrated] = useState(false);
   const [skipInitialLiturgiaImport, setSkipInitialLiturgiaImport] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
@@ -948,15 +944,12 @@ export default function Home() {
     }
   }, [insertReferenceId, sectionOrder]);
 
-  const generatePresentation = async (format: ExportFormat) => {
-    setLoadingExport(format);
-    setStatusMessage(
-      format === "pdf" ? "Gerando PDF..." : "Gerando apresentação...",
-      "loading",
-    );
+  const generatePptx = async () => {
+    setLoadingPpt(true);
+    setStatusMessage("Gerando apresentação...", "loading");
     const payload: GeneratePayload = { presentationTitle, sectionOrder, sections, options };
     try {
-      const response = await fetch(`/api/generate?format=${format}`, {
+      const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -969,35 +962,21 @@ export default function Home() {
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = parseFilename(
-        response.headers.get("content-disposition"),
-        format === "pdf" ? "Missa.pdf" : "Missa.pptx",
-      );
+      anchor.download = parseFilename(response.headers.get("content-disposition"));
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
       window.URL.revokeObjectURL(url);
 
-      setStatusMessage(
-        format === "pdf" ? "Download do PDF iniciado." : "Download iniciado.",
-        "success",
-      );
+      setStatusMessage("Download iniciado.", "success");
     } catch (error) {
       setStatusMessage(
         error instanceof Error ? error.message : "Erro ao gerar arquivo.",
         "error",
       );
     } finally {
-      setLoadingExport(null);
+      setLoadingPpt(false);
     }
-  };
-
-  const generatePptx = async () => {
-    await generatePresentation("pptx");
-  };
-
-  const generatePdf = async () => {
-    await generatePresentation("pdf");
   };
 
   const toggleOption = (key: keyof GeneratorOptions) => {
@@ -1109,24 +1088,17 @@ export default function Home() {
             </label>
             <button
               onClick={fetchLiturgia}
-              disabled={loadingLiturgia || loadingExport !== null}
+              disabled={loadingLiturgia || loadingPpt}
               className="rounded bg-sky-700 px-3 py-1 text-sm font-semibold text-white"
             >
               {loadingLiturgia ? "Buscando..." : "Buscar liturgia"}
             </button>
             <button
               onClick={generatePptx}
-              disabled={loadingExport !== null || loadingLiturgia}
+              disabled={loadingPpt || loadingLiturgia}
               className="rounded bg-amber-500 px-3 py-1 text-sm font-semibold text-stone-900"
             >
-              {loadingExport === "pptx" ? "Gerando..." : "Gerar .pptx"}
-            </button>
-            <button
-              onClick={generatePdf}
-              disabled={loadingExport !== null || loadingLiturgia}
-              className="rounded bg-rose-600 px-3 py-1 text-sm font-semibold text-white"
-            >
-              {loadingExport === "pdf" ? "Gerando..." : "Gerar .pdf"}
+              {loadingPpt ? "Gerando..." : "Gerar .pptx"}
             </button>
             <p
               role="status"

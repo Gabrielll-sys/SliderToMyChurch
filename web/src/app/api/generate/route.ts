@@ -1,8 +1,5 @@
 ﻿import fs from "node:fs";
-import { execFile } from "node:child_process";
-import os from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
 
 import { NextResponse } from "next/server";
 import PptxGenJS from "pptxgenjs";
@@ -61,79 +58,10 @@ type GenerationItem =
   | { kind: "section"; sectionId: string }
   | { kind: "fixed"; token: FixedToken };
 
-type OutputFormat = "pptx" | "pdf";
-
-const execFileAsync = promisify(execFile);
-
 function createSlide(pptx: PptxGenJS): PptxGenJS.Slide {
   const slide = pptx.addSlide();
   slide.background = { color: COLOR_BG };
   return slide;
-}
-
-function parseOutputFormat(request: Request): OutputFormat {
-  const format = new URL(request.url).searchParams.get("format");
-  return format === "pdf" ? "pdf" : "pptx";
-}
-
-function escapePowerShellLiteral(value: string): string {
-  return value.replaceAll("'", "''");
-}
-
-async function convertPptxToPdf(pptxBuffer: Buffer): Promise<Buffer> {
-  if (process.platform !== "win32") {
-    throw new Error("A exportacao em PDF exige Windows com Microsoft PowerPoint instalado.");
-  }
-
-  const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "slide-generator-"));
-  const pptxPath = path.join(tempDir, "presentation.pptx");
-  const pdfPath = path.join(tempDir, "presentation.pdf");
-
-  const script = [
-    "$ErrorActionPreference = 'Stop'",
-    `$pptxPath = '${escapePowerShellLiteral(pptxPath)}'`,
-    `$pdfPath = '${escapePowerShellLiteral(pdfPath)}'`,
-    "$powerPoint = $null",
-    "$presentation = $null",
-    "try {",
-    "  $powerPoint = New-Object -ComObject PowerPoint.Application",
-    "  $powerPoint.DisplayAlerts = 0",
-    "  $presentation = $powerPoint.Presentations.Open($pptxPath, 0, 0, 0)",
-    "  $presentation.SaveAs($pdfPath, 32)",
-    "} finally {",
-    "  if ($presentation -ne $null) {",
-    "    try { $presentation.Close() } catch {}",
-    "    [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($presentation)",
-    "  }",
-    "  if ($powerPoint -ne $null) {",
-    "    try { $powerPoint.Quit() } catch {}",
-    "    [void][System.Runtime.InteropServices.Marshal]::ReleaseComObject($powerPoint)",
-    "  }",
-    "  [GC]::Collect()",
-    "  [GC]::WaitForPendingFinalizers()",
-    "}",
-    "if (-not (Test-Path $pdfPath)) {",
-    "  throw 'O PowerPoint nao retornou um arquivo PDF.'",
-    "}",
-  ].join("; ");
-
-  try {
-    await fs.promises.writeFile(pptxPath, pptxBuffer);
-
-    await execFileAsync(
-      "powershell.exe",
-      ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script],
-      { windowsHide: true },
-    );
-
-    return await fs.promises.readFile(pdfPath);
-  } catch {
-    throw new Error(
-      "Nao foi possivel converter para PDF. Verifique se o Microsoft PowerPoint esta instalado neste computador.",
-    );
-  } finally {
-    await fs.promises.rm(tempDir, { recursive: true, force: true });
-  }
 }
 
 function toTextBlockConfig(style: TextStyle, color: string): TextBlockConfig {
@@ -861,7 +789,6 @@ function addSectionSlides(pptx: PptxGenJS, section: SectionState): number {
 
 export async function POST(request: Request) {
   try {
-    const format = parseOutputFormat(request);
     const body = await request.json();
     const payload = parsePayload(body);
 
@@ -914,22 +841,18 @@ export async function POST(request: Request) {
       generatedSlides += addTitle(pptx, "SEM CONTEÚDO");
     }
 
-    const pptxBuffer = (await pptx.write({
+    const buffer = (await pptx.write({
       outputType: "nodebuffer",
     })) as Buffer;
-    const outputBuffer = format === "pdf" ? await convertPptxToPdf(pptxBuffer) : pptxBuffer;
+    const bytes = new Uint8Array(buffer);
     const fileTitle = sanitizeTitleForFilename(payload.presentationTitle);
-    const extension = format === "pdf" ? "pdf" : "pptx";
-    const utf8Filename = `Slides ${fileTitle}.${extension}`;
-    const asciiFilename = `Slides ${toAsciiFilenameFallback(fileTitle)}.${extension}`;
-    const responseBody = Uint8Array.from(outputBuffer).buffer;
+    const utf8Filename = `Slides ${fileTitle}.pptx`;
+    const asciiFilename = `Slides ${toAsciiFilenameFallback(fileTitle)}.pptx`;
 
-    return new NextResponse(responseBody, {
+    return new NextResponse(bytes, {
       headers: {
         "Content-Type":
-          format === "pdf"
-            ? "application/pdf"
-            : "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         "Content-Disposition": `attachment; filename="${asciiFilename}"; filename*=UTF-8''${encodeURIComponent(
           utf8Filename,
         )}`,
