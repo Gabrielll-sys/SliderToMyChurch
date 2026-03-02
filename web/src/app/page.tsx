@@ -57,6 +57,20 @@ const SECTION_TYPE_LABELS: Record<SectionType, string> = {
   palavra: "Palavra",
 };
 
+const SECTION_TYPE_ICONS: Record<SectionType, string> = {
+  musica: "🎵",
+  leitura: "📖",
+  aclamacao: "📢",
+  palavra: "💬",
+};
+
+const SECTION_TYPE_BADGE_CLASSES: Record<SectionType, string> = {
+  musica: "bg-amber-100 text-amber-800 border-amber-300",
+  leitura: "bg-sky-100 text-sky-800 border-sky-300",
+  aclamacao: "bg-emerald-100 text-emerald-800 border-emerald-300",
+  palavra: "bg-violet-100 text-violet-800 border-violet-300",
+};
+
 const FONT_OPTIONS = ["Arial", "Calibri", "Montserrat", "Segoe UI", "Times New Roman"];
 
 type LineField =
@@ -271,148 +285,166 @@ function clamp(value: number, min: number, max: number): number {
 function StyleEditor({
   style,
   onPatch,
+  label,
 }: {
   style: TextStyle;
   onPatch: (patch: Partial<TextStyle>) => void;
+  label?: string;
 }) {
   return (
-    <div className="space-y-2 rounded-lg border border-stone-200 bg-stone-50 p-2">
-      <div className="grid gap-2 sm:grid-cols-5">
-        <label className="space-y-1 text-sm">
-          <span className="font-medium text-stone-700">Fonte</span>
-          <select
-            value={style.fontFace}
-            onChange={(event) => onPatch({ fontFace: event.target.value })}
-            className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
-            aria-label="Fonte do texto"
-          >
-            {FONT_OPTIONS.map((font) => (
-              <option key={font}>{font}</option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1 text-sm">
-          <span className="font-medium text-stone-700">Tamanho</span>
-          <input
-            type="number"
-            value={style.fontSize}
-            min={8}
-            max={120}
-            onChange={(event) => {
-              const next = Number(event.target.value);
-              if (Number.isFinite(next)) {
-                onPatch({ fontSize: clamp(Math.round(next), 8, 120) });
-              }
-            }}
-            className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
-            aria-label="Tamanho da fonte"
-          />
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input
-            type="checkbox"
-            checked={style.bold}
-            onChange={() => onPatch({ bold: !style.bold })}
-          />
-          Negrito
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input
-            type="checkbox"
-            checked={style.italic}
-            onChange={() => onPatch({ italic: !style.italic })}
-          />
-          Itálico
-        </label>
-        <label className="flex items-center gap-1 text-sm">
-          <input
-            type="checkbox"
-            checked={style.uppercase}
-            onChange={() => onPatch({ uppercase: !style.uppercase })}
-          />
-          Maiúsculas
-        </label>
+    <details className="group rounded-lg border border-stone-200 bg-stone-50">
+      <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-xs font-medium text-stone-500 select-none hover:text-stone-700">
+        <span>⚙</span>
+        <span>{label ?? "Ajustar estilo"}</span>
+        <span className="ml-auto text-[10px] opacity-60 group-open:hidden">▸</span>
+        <span className="ml-auto text-[10px] opacity-60 hidden group-open:inline">▾</span>
+      </summary>
+      <div className="space-y-2 border-t border-stone-200 p-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-stone-700">Fonte</span>
+            <select
+              value={style.fontFace}
+              onChange={(event) => onPatch({ fontFace: event.target.value })}
+              className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+              aria-label="Fonte do texto"
+            >
+              {FONT_OPTIONS.map((font) => (
+                <option key={font}>{font}</option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-stone-700">Tamanho</span>
+            <input
+              type="number"
+              value={style.fontSize}
+              min={8}
+              max={120}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                if (Number.isFinite(next)) {
+                  onPatch({ fontSize: clamp(Math.round(next), 8, 120) });
+                }
+              }}
+              className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+              aria-label="Tamanho da fonte"
+            />
+          </label>
+          <label className="flex items-center gap-1 text-sm">
+            <input
+              type="checkbox"
+              checked={style.bold}
+              onChange={() => onPatch({ bold: !style.bold })}
+            />
+            Negrito
+          </label>
+          <label className="flex items-center gap-1 text-sm">
+            <input
+              type="checkbox"
+              checked={style.italic}
+              onChange={() => onPatch({ italic: !style.italic })}
+            />
+            Itálico
+          </label>
+          <label className="flex items-center gap-1 text-sm">
+            <input
+              type="checkbox"
+              checked={style.uppercase}
+              onChange={() => onPatch({ uppercase: !style.uppercase })}
+            />
+            Maiúsculas
+          </label>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-stone-700">Espaçamento</span>
+            <input
+              type="number"
+              step={0.01}
+              min={0.9}
+              max={1.8}
+              value={style.lineSpacing}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                if (Number.isFinite(next)) {
+                  onPatch({ lineSpacing: clamp(next, 0.9, 1.8) });
+                }
+              }}
+              className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+              aria-label="Espaçamento entre linhas"
+            />
+          </label>
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-stone-700">Preenchimento</span>
+            <input
+              type="number"
+              step={0.01}
+              min={0.3}
+              max={0.95}
+              value={style.minFillRatio}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                if (Number.isFinite(next)) {
+                  onPatch({ minFillRatio: clamp(next, 0.3, 0.95) });
+                }
+              }}
+              className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+              aria-label="Preenchimento mínimo do slide"
+            />
+          </label>
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-stone-700">Mín. última página</span>
+            <input
+              type="number"
+              min={1}
+              max={8}
+              value={style.minLastLines}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                if (Number.isFinite(next)) {
+                  onPatch({ minLastLines: clamp(Math.round(next), 1, 8) });
+                }
+              }}
+              className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+              aria-label="Linhas mínimas na última página"
+            />
+          </label>
+          <label className="space-y-1 text-sm">
+            <span className="font-medium text-stone-700">Máx. por slide</span>
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={style.hardMaxLines ?? ""}
+              onChange={(event) => {
+                const raw = event.target.value.trim();
+                if (!raw) {
+                  onPatch({ hardMaxLines: undefined });
+                  return;
+                }
+                const next = Number(raw);
+                if (Number.isFinite(next)) {
+                  onPatch({ hardMaxLines: clamp(Math.round(next), 1, 12) });
+                }
+              }}
+              className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
+              placeholder="Auto"
+              aria-label="Máximo de linhas por slide"
+            />
+          </label>
+        </div>
       </div>
-      <div className="grid gap-2 sm:grid-cols-4">
-        <label className="space-y-1 text-sm">
-          <span className="font-medium text-stone-700">Espaçamento</span>
-          <input
-            type="number"
-            step={0.01}
-            min={0.9}
-            max={1.8}
-            value={style.lineSpacing}
-            onChange={(event) => {
-              const next = Number(event.target.value);
-              if (Number.isFinite(next)) {
-                onPatch({ lineSpacing: clamp(next, 0.9, 1.8) });
-              }
-            }}
-            className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
-            aria-label="Espaçamento entre linhas"
-          />
-        </label>
-        <label className="space-y-1 text-sm">
-          <span className="font-medium text-stone-700">Preenchimento</span>
-          <input
-            type="number"
-            step={0.01}
-            min={0.3}
-            max={0.95}
-            value={style.minFillRatio}
-            onChange={(event) => {
-              const next = Number(event.target.value);
-              if (Number.isFinite(next)) {
-                onPatch({ minFillRatio: clamp(next, 0.3, 0.95) });
-              }
-            }}
-            className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
-            aria-label="Preenchimento mínimo do slide"
-          />
-        </label>
-        <label className="space-y-1 text-sm">
-          <span className="font-medium text-stone-700">Mín. última página</span>
-          <input
-            type="number"
-            min={1}
-            max={8}
-            value={style.minLastLines}
-            onChange={(event) => {
-              const next = Number(event.target.value);
-              if (Number.isFinite(next)) {
-                onPatch({ minLastLines: clamp(Math.round(next), 1, 8) });
-              }
-            }}
-            className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
-            aria-label="Linhas mínimas na última página"
-          />
-        </label>
-        <label className="space-y-1 text-sm">
-          <span className="font-medium text-stone-700">Máx. por slide</span>
-          <input
-            type="number"
-            min={1}
-            max={12}
-            value={style.hardMaxLines ?? ""}
-            onChange={(event) => {
-              const raw = event.target.value.trim();
-              if (!raw) {
-                onPatch({ hardMaxLines: undefined });
-                return;
-              }
-              const next = Number(raw);
-              if (Number.isFinite(next)) {
-                onPatch({ hardMaxLines: clamp(Math.round(next), 1, 12) });
-              }
-            }}
-            className="w-full rounded border border-stone-300 px-2 py-1 text-sm"
-            placeholder="Auto"
-            aria-label="Máximo de linhas por slide"
-          />
-        </label>
-      </div>
-    </div>
+    </details>
   );
+}
+
+function sectionHasContent(section: SectionState): boolean {
+  const fields: LineField[] = ["refrainLines", "verseLines", "wordLines", "yellowTitleLines", "whiteTextLines", "acclamationLines", "antiphonLines"];
+  return fields.some((f) => {
+    const val = section[f] as string[];
+    return val && val.some((line) => line.trim().length > 0);
+  });
 }
 
 type SectionEditorCardProps = {
@@ -450,17 +482,25 @@ function SectionEditorCard({
   onScheduleAutoDetectRefrain,
   onUpdateStyle,
 }: SectionEditorCardProps) {
+  const hasContent = sectionHasContent(section);
+
   return (
     <details
       open={isOpen}
       onToggle={(event) => onToggleOpen(id, event.currentTarget.open)}
-      className="rounded-xl border border-stone-200 bg-white"
+      className="rounded-xl border border-stone-200 bg-white transition-shadow hover:shadow-sm"
     >
-      <summary className="flex cursor-pointer justify-between px-4 py-2 text-sm font-semibold">
-        <span>
-          {(section.title || section.name)} ({SECTION_TYPE_LABELS[section.type]})
+      <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 text-sm font-semibold select-none">
+        <span className={`inline-block h-2 w-2 rounded-full flex-shrink-0 ${
+          hasContent ? "bg-emerald-500" : "bg-stone-300"
+        }`} title={hasContent ? "Conteúdo preenchido" : "Seção vazia"} />
+        <span className="flex-1">
+          {section.title || section.name}
         </span>
-        <span>{isOpen ? "▾" : "▸"}</span>
+        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${SECTION_TYPE_BADGE_CLASSES[section.type]}`}>
+          {SECTION_TYPE_ICONS[section.type]} {SECTION_TYPE_LABELS[section.type]}
+        </span>
+        <span className="text-stone-400 text-xs ml-1">{isOpen ? "▾" : "▸"}</span>
       </summary>
 
       <div className="space-y-3 border-t border-stone-200 p-4">
@@ -468,34 +508,37 @@ function SectionEditorCard({
           <button
             onClick={() => onMove(id, -1)}
             disabled={!canMoveUp}
-            className={`rounded border border-stone-300 px-2 py-1 text-sm ${
-              canMoveUp ? "" : "cursor-not-allowed opacity-50"
+            title="Mover seção para cima"
+            className={`rounded border border-stone-300 px-2.5 py-1 text-sm ${
+              canMoveUp ? "hover:bg-stone-100" : "cursor-not-allowed opacity-40"
             }`}
           >
-            Mover seção para cima
+            ↑
           </button>
           <button
             onClick={() => onMove(id, 1)}
             disabled={!canMoveDown}
-            className={`rounded border border-stone-300 px-2 py-1 text-sm ${
-              canMoveDown ? "" : "cursor-not-allowed opacity-50"
+            title="Mover seção para baixo"
+            className={`rounded border border-stone-300 px-2.5 py-1 text-sm ${
+              canMoveDown ? "hover:bg-stone-100" : "cursor-not-allowed opacity-40"
             }`}
           >
-            Mover seção para baixo
+            ↓
           </button>
           {section.type === "musica" && (
             <button
               onClick={() => onDetectRefrain(id)}
-              className="rounded border border-amber-300 px-2 py-1 text-sm"
+              className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-sm hover:bg-amber-100 transition-colors"
             >
-              Detectar refrão
+              🔍 Detectar refrão
             </button>
           )}
           <button
             onClick={() => onDelete(id)}
-            className="rounded border border-red-300 px-2 py-1 text-sm"
+            title="Excluir seção"
+            className="ml-auto rounded border border-red-200 bg-red-50 px-2.5 py-1 text-sm text-red-600 hover:bg-red-100 transition-colors"
           >
-            Excluir seção
+            🗑
           </button>
         </div>
 
@@ -530,6 +573,7 @@ function SectionEditorCard({
         )}
 
         <StyleEditor
+          label="Estilo do título"
           style={section.styles.title}
           onPatch={(patch) => onUpdateStyle(id, "title", patch)}
         />
@@ -558,6 +602,7 @@ function SectionEditorCard({
                 aria-label={`${spec.label} da seção ${section.title || section.name}`}
               />
               <StyleEditor
+                label={`Estilo: ${spec.label}`}
                 style={section.styles[spec.styleKey]}
                 onPatch={(patch) => onUpdateStyle(id, spec.styleKey, patch)}
               />
@@ -1054,7 +1099,7 @@ export default function Home() {
   const canAddSection = newSectionName.trim().length > 0;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#f5f0d3_0%,#f4f7fb_45%,#eef1f7_100%)] p-4 md:p-8">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,#f5f0d3_0%,#f4f7fb_45%,#eef1f7_100%)] p-3 pb-28 sm:p-4 sm:pb-24 md:p-8 md:pb-24">
       <main className="mx-auto flex max-w-6xl flex-col gap-4">
         <h1 className="sr-only">Editor de slides litúrgicos</h1>
         <section className="rounded-xl border border-stone-200 bg-white p-4">
@@ -1068,14 +1113,14 @@ export default function Home() {
             id="presentationTitle"
             value={presentationTitle}
             onChange={(event) => setPresentationTitle(event.target.value)}
-            className="mb-2 min-h-40 w-full rounded border border-stone-300 p-2 text-sm"
+            className="mb-2 min-h-20 w-full rounded border border-stone-300 p-2 text-sm"
             placeholder="Ex.: DOMINGO DA QUARESMA"
           />
           <p className="mb-3 text-xs text-stone-500">
             Use uma linha por bloco de título. Exemplo: linha 1 com o tema e linha 2 com o tempo
             litúrgico.
           </p>
-          <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
             <label className="space-y-1 text-sm">
               <span className="font-medium text-stone-700">Data da liturgia</span>
               <input
@@ -1086,20 +1131,22 @@ export default function Home() {
                 className="rounded border border-stone-300 px-2 py-1 text-sm"
               />
             </label>
-            <button
-              onClick={fetchLiturgia}
-              disabled={loadingLiturgia || loadingPpt}
-              className="rounded bg-sky-700 px-3 py-1 text-sm font-semibold text-white"
-            >
-              {loadingLiturgia ? "Buscando..." : "Buscar liturgia"}
-            </button>
-            <button
-              onClick={generatePptx}
-              disabled={loadingPpt || loadingLiturgia}
-              className="rounded bg-amber-500 px-3 py-1 text-sm font-semibold text-stone-900"
-            >
-              {loadingPpt ? "Gerando..." : "Gerar .pptx"}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={fetchLiturgia}
+                disabled={loadingLiturgia || loadingPpt}
+                className="rounded border border-sky-300 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-100 transition-colors"
+              >
+                {loadingLiturgia ? "Buscando..." : "📅 Buscar liturgia"}
+              </button>
+              <button
+                onClick={generatePptx}
+                disabled={loadingPpt || loadingLiturgia}
+                className="hidden sm:inline-flex rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-2 text-sm font-bold text-white shadow-md hover:from-amber-600 hover:to-amber-700 hover:shadow-lg transition-all disabled:opacity-50"
+              >
+                {loadingPpt ? "⏳ Gerando..." : "▶ Gerar .pptx"}
+              </button>
+            </div>
             <p
               role="status"
               aria-live="polite"
@@ -1111,8 +1158,9 @@ export default function Home() {
         </section>
 
         <section className="rounded-xl border border-stone-200 bg-white p-4">
-          <p className="mb-2 text-sm font-semibold text-stone-800">Adicionar seção</p>
-          <div className="mb-2 flex flex-wrap items-end gap-2">
+          {/* Sub-block: Add new section */}
+          <p className="mb-2 text-sm font-semibold text-stone-800">➕ Adicionar seção</p>
+          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
             <label className="space-y-1 text-sm">
               <span className="font-medium text-stone-700">Nome</span>
               <input
@@ -1174,32 +1222,42 @@ export default function Home() {
               disabled={!canAddSection}
               className={`rounded px-3 py-1 text-sm font-semibold text-white ${
                 canAddSection
-                  ? "bg-stone-800"
+                  ? "bg-stone-800 hover:bg-stone-900 transition-colors"
                   : "cursor-not-allowed bg-stone-400"
               }`}
             >
-              Adicionar
-            </button>
-            <button
-              onClick={() => void restoreDefaults()}
-              className="rounded border border-stone-300 px-3 py-1 text-sm font-semibold text-stone-800"
-            >
-              Restaurar padrão
+              + Adicionar
             </button>
           </div>
-          <p className="mb-2 text-xs text-stone-500">
+          <p className="text-xs text-stone-500">
             Dica: escolha a posição e a referência para inserir a nova seção no ponto certo da
             celebração.
           </p>
 
-          <div className="mb-2 flex flex-wrap gap-2">
+          {/* Separator */}
+          <hr className="my-3 border-stone-200" />
+
+          {/* Sub-block: Fixed liturgical elements */}
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Elementos fixos da celebração</p>
+          <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1 sm:flex sm:flex-wrap">
             {BOOLEAN_OPTION_KEYS.map((key) => (
-              <label key={key} className="flex items-center gap-1 text-sm">
-                <input type="checkbox" checked={Boolean(options[key])} onChange={() => toggleOption(key)} />
+              <label key={key} className="flex items-center gap-1.5 text-sm">
+                <input type="checkbox" checked={Boolean(options[key])} onChange={() => toggleOption(key)} className="accent-amber-500" />
                 {BOOLEAN_OPTION_LABELS[key]}
               </label>
             ))}
           </div>
+
+          {/* Separator */}
+          <hr className="my-3 border-stone-200" />
+
+          {/* Sub-block: General actions */}
+          <button
+            onClick={() => void restoreDefaults()}
+            className="rounded border border-stone-300 px-3 py-1 text-sm font-semibold text-stone-600 hover:bg-stone-100 transition-colors"
+          >
+            ↺ Restaurar padrão
+          </button>
         </section>
 
         {sectionOrder.map((id, index) => {
@@ -1230,6 +1288,16 @@ export default function Home() {
           );
         })}
       </main>
+
+      {/* Floating Action Button — sempre visível */}
+      <button
+        onClick={generatePptx}
+        disabled={loadingPpt || loadingLiturgia}
+        className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg sm:bottom-6 sm:right-6 sm:px-6 sm:py-3 sm:text-sm hover:from-amber-600 hover:to-amber-700 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        title="Gerar apresentação PowerPoint"
+      >
+        {loadingPpt ? "⏳ Gerando..." : "▶ Gerar .pptx"}
+      </button>
     </div>
   );
 }

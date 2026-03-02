@@ -276,9 +276,25 @@ function toSectionsAndOrder(
       ? (sectionsValue as Record<string, unknown>)
       : {};
 
+  // When the frontend sends an explicit sectionOrder, we respect it: any
+  // default section NOT present in that order was intentionally deleted by
+  // the user and should not be re-created.
+  const hasExplicitOrder = Array.isArray(orderValue) && orderValue.length > 0;
+  const explicitOrderSet = hasExplicitOrder
+    ? new Set(
+      (orderValue as unknown[]).filter(
+        (item): item is string => typeof item === "string",
+      ),
+    )
+    : null;
+
   const sections: SectionsState = {};
 
   for (const [defaultId, defaultSection] of Object.entries(defaults)) {
+    // Skip default sections that the user explicitly removed.
+    if (explicitOrderSet && !explicitOrderSet.has(defaultId) && !(defaultId in rawSections)) {
+      continue;
+    }
     sections[defaultId] = normalizeSectionState(rawSections[defaultId], defaultSection);
   }
 
@@ -300,13 +316,13 @@ function toSectionsAndOrder(
     sections[id] = normalizeSectionState(incomingValue, base);
   }
 
-  const rawOrder = Array.isArray(orderValue)
-    ? orderValue.filter((item): item is string => typeof item === "string")
+  const rawOrder = hasExplicitOrder
+    ? (orderValue as unknown[]).filter((item): item is string => typeof item === "string")
     : buildInitialSectionOrder();
 
   const order: string[] = [];
   const seen = new Set<string>();
-  // Preserve requested order first, then append missing canonical/custom sections.
+  // Preserve requested order — only include sections that exist.
   for (const id of rawOrder) {
     if (!sections[id] || seen.has(id)) {
       continue;
@@ -315,10 +331,13 @@ function toSectionsAndOrder(
     order.push(id);
   }
 
-  for (const defaultId of DEFAULT_SECTION_ORDER) {
-    if (sections[defaultId] && !seen.has(defaultId)) {
-      seen.add(defaultId);
-      order.push(defaultId);
+  // Only append missing defaults when no explicit order was given (legacy payloads).
+  if (!hasExplicitOrder) {
+    for (const defaultId of DEFAULT_SECTION_ORDER) {
+      if (sections[defaultId] && !seen.has(defaultId)) {
+        seen.add(defaultId);
+        order.push(defaultId);
+      }
     }
   }
 
@@ -861,9 +880,8 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       {
-        error: `Erro ao gerar apresentação: ${
-          error instanceof Error ? error.message : "desconhecido"
-        }`,
+        error: `Erro ao gerar apresentação: ${error instanceof Error ? error.message : "desconhecido"
+          }`,
       },
       { status: 500 },
     );
