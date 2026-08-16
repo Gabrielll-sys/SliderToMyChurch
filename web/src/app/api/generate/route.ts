@@ -64,6 +64,11 @@ function createSlide(pptx: PptxGenJS): PptxGenJS.Slide {
   return slide;
 }
 
+function addSectionSeparatorSlide(pptx: PptxGenJS): number {
+  createSlide(pptx);
+  return 1;
+}
+
 function toTextBlockConfig(style: TextStyle, color: string): TextBlockConfig {
   return {
     color,
@@ -819,6 +824,7 @@ export async function POST(request: Request) {
     pptx.title = payload.presentationTitle;
 
     let generatedSlides = 0;
+    let hasGeneratedSection = false;
 
     generatedSlides += addTextBlocks(
       pptx,
@@ -853,7 +859,11 @@ export async function POST(request: Request) {
         continue;
       }
 
+      if (hasGeneratedSection) {
+        generatedSlides += addSectionSeparatorSlide(pptx);
+      }
       generatedSlides += addSectionSlides(pptx, section);
+      hasGeneratedSection = true;
     }
 
     if (generatedSlides === 0) {
@@ -887,4 +897,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
